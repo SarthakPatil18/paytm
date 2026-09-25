@@ -103,7 +103,7 @@ export default function DemoPage() {
         <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: "#002e6e", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-              Good morning, Sushrut
+              Welcome to FinPath AI
             </h1>
             <p style={{ color: "#475569", fontSize: 14, margin: 0 }}>
               Live demo of FinPath AI’s goal-first financial journey platform.

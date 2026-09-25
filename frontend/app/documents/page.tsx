@@ -97,14 +97,14 @@ export default function DocumentCenterPage() {
     setSelectedDoc(doc);
     if (doc.document_type === "salary_slip") {
       setSampleData({
-        employee_name: "Sushrut Kale",
+        employee_name: "Account Holder",
         employer_name: "FinPath Technologies",
         net_salary: 68500,
       });
     } else if (doc.document_type === "bank_statement") {
       setSampleData({
         bank_name: "HDFC Bank",
-        account_holder: "Sushrut Kale",
+        account_holder: "Account Holder",
         approximate_balance: 345000,
       });
     } else {
