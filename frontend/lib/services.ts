@@ -7,6 +7,10 @@ import type {
   FinancialProfile,
   Document,
   DocumentExtraction,
+  Notification,
+  NotificationSummary,
+  ReadinessReport,
+  NBAAction,
 } from "@/types";
 
 // ============================================================
@@ -50,6 +54,16 @@ export async function updateMission(id: number, data: Partial<FinancialMission>)
   return res.data;
 }
 
+export async function getMissionReadiness(missionId: number): Promise<ReadinessReport> {
+  const res = await api.get(`/api/missions/${missionId}/readiness`);
+  return res.data;
+}
+
+export async function getMissionNBA(missionId: number): Promise<NBAAction> {
+  const res = await api.get(`/api/missions/${missionId}/nba`);
+  return res.data;
+}
+
 // ============================================================
 // AI
 // ============================================================
@@ -60,6 +74,16 @@ export async function parseGoal(text: string): Promise<GoalParseResponse> {
 
 export async function chatAssistant(message: string, missionId?: number): Promise<{ reply: string; suggested_actions: string[] }> {
   const res = await api.post("/api/ai/chat", { message, mission_id: missionId });
+  return res.data;
+}
+
+export async function getGlobalNBA(): Promise<NBAAction> {
+  const res = await api.get("/api/ai/nba");
+  return res.data;
+}
+
+export async function getGlobalReadiness(): Promise<ReadinessReport> {
+  const res = await api.get("/api/ai/readiness");
   return res.data;
 }
 
@@ -107,6 +131,10 @@ export async function setDocumentType(documentId: number, documentType: string):
   return res.data;
 }
 
+export async function deleteDocument(documentId: number): Promise<void> {
+  await api.delete(`/api/documents/${documentId}`);
+}
+
 // ============================================================
 // PROFILE
 // ============================================================
@@ -117,5 +145,28 @@ export async function getProfile(): Promise<FinancialProfile> {
 
 export async function updateProfile(data: Partial<FinancialProfile>): Promise<FinancialProfile> {
   const res = await api.patch("/api/profile/", data);
+  return res.data;
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+export async function listNotifications(limit = 20): Promise<Notification[]> {
+  const res = await api.get(`/api/notifications/?limit=${limit}`);
+  return res.data;
+}
+
+export async function getNotificationSummary(): Promise<NotificationSummary> {
+  const res = await api.get("/api/notifications/summary");
+  return res.data;
+}
+
+export async function markNotificationRead(id: number): Promise<Notification> {
+  const res = await api.patch(`/api/notifications/${id}/read`);
+  return res.data;
+}
+
+export async function markAllNotificationsRead(): Promise<{ marked_read: number }> {
+  const res = await api.post("/api/notifications/mark-all-read");
   return res.data;
 }

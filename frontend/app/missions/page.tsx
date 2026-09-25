@@ -1,291 +1,325 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import AppNav from "@/components/layout/AppNav";
-import { listMissions } from "@/lib/services";
-import type { FinancialMission } from "@/types";
-import { GOAL_CATEGORY_ICONS, GOAL_CATEGORY_LABELS } from "@/types";
-import { formatAmount } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { isAuthenticated, formatAmount } from "@/lib/utils";
+import { listMissions, getMissionReadiness, getMissionNBA, updateMission } from "@/lib/services";
+import type { FinancialMission, ReadinessReport, NBAAction } from "@/types";
+import { GOAL_CATEGORY_ICONS, GOAL_CATEGORY_LABELS, MISSION_STAGES } from "@/types";
 
-const JOURNEY_STAGES = [
-  { id: "goal", label: "Goal Definition", icon: "🎯", status: "completed", desc: "Goal set and validated" },
-  { id: "profile", label: "Profile", icon: "👤", status: "completed", desc: "Financial profile verified" },
-  { id: "documents", label: "Documents", icon: "📁", status: "active", desc: "Document verification in progress" },
-  { id: "assessment", label: "Assessment", icon: "📊", status: "upcoming", desc: "Financial readiness calculation" },
-  { id: "options", label: "Financial Options", icon: "💳", status: "upcoming", desc: "Personalized funding & loan options" },
-  { id: "application", label: "Application", icon: "📝", status: "upcoming", desc: "Direct partner institution apply" },
-  { id: "completion", label: "Completion", icon: "🎓", status: "upcoming", desc: "Funding disbursed & journey complete" },
-];
+type StageStatus = "completed" | "current" | "upcoming" | "blocked";
+
+function getStageStatus(stageNum: number, missionStage: number): StageStatus {
+  if (stageNum < missionStage) return "completed";
+  if (stageNum === missionStage) return "current";
+  return "upcoming";
+}
+
+const STATUS_STYLE: Record<StageStatus, { border: string; bg: string; dotBg: string; labelColor: string }> = {
+  completed: { border: "#16803C", bg: "#F0FFF4", dotBg: "#16803C", labelColor: "#16803C" },
+  current: { border: "#0057D9", bg: "#EEF4FF", dotBg: "#0057D9", labelColor: "#0057D9" },
+  upcoming: { border: "#D9E2EC", bg: "#fff", dotBg: "#D9E2EC", labelColor: "#52606D" },
+  blocked: { border: "#D64545", bg: "#FFF5F5", dotBg: "#D64545", labelColor: "#D64545" },
+};
 
 export default function MissionsPage() {
+  const router = useRouter();
   const [missions, setMissions] = useState<FinancialMission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStage, setSelectedStage] = useState<string>("documents");
+  const [selectedMission, setSelectedMission] = useState<FinancialMission | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
+  const [nba, setNba] = useState<NBAAction | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
+  const [advancing, setAdvancing] = useState(false);
 
   useEffect(() => {
+    if (!isAuthenticated()) { router.replace("/login"); return; }
     loadMissions();
   }, []);
 
-  const loadMissions = async () => {
+  async function loadMissions() {
     try {
       const data = await listMissions();
       setMissions(data);
+      const active = data.find((m) => m.status === "ACTIVE") || data[0];
+      if (active) {
+        setSelectedMission(active);
+        setSelectedStageId(active.stage);
+        const [r, n] = await Promise.allSettled([
+          getMissionReadiness(active.id),
+          getMissionNBA(active.id),
+        ]);
+        if (r.status === "fulfilled") setReadiness(r.value);
+        if (n.status === "fulfilled") setNba(n.value);
+      }
     } catch {
-      // Handled silently
+      // silently handled
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const activeMission = missions.find((m) => m.status === "ACTIVE") || missions[0];
+  async function handleSelectMission(m: FinancialMission) {
+    setSelectedMission(m);
+    setSelectedStageId(m.stage);
+    setReadiness(null);
+    setNba(null);
+    try {
+      const [r, n] = await Promise.allSettled([
+        getMissionReadiness(m.id),
+        getMissionNBA(m.id),
+      ]);
+      if (r.status === "fulfilled") setReadiness(r.value);
+      if (n.status === "fulfilled") setNba(n.value);
+    } catch {}
+  }
+
+  async function handleAdvanceStage() {
+    if (!selectedMission) return;
+    const nextStage = Math.min(selectedMission.stage + 1, 7);
+    setAdvancing(true);
+    try {
+      const updated = await updateMission(selectedMission.id, { stage: nextStage });
+      setSelectedMission(updated);
+      setMissions((prev) => prev.map((m) => m.id === updated.id ? updated : m));
+    } catch {}
+    finally { setAdvancing(false); }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#F5F8FC", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#52606D" }}>Loading missions…</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f4f6fb", paddingBottom: 80 }}>
-      <AppNav />
-
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 24px" }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#0052cc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Journey Tracking
-            </span>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: "#002e6e", margin: "4px 0 0", letterSpacing: "-0.02em" }}>
-              Financial Missions
-            </h1>
-            <p style={{ color: "#475569", fontSize: 14, margin: "4px 0 0" }}>
-              Every major financial milestone lives here as an adaptive, milestone-driven mission.
-            </p>
-          </div>
-          <Link href="/mission/new" className="btn-primary" style={{ padding: "10px 20px" }}>
-            + Create New Mission
-          </Link>
+    <div style={{ minHeight: "100vh", background: "#F5F8FC" }}>
+      {/* Header */}
+      <div style={{
+        background: "#fff", borderBottom: "1px solid #D9E2EC",
+        padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#102A43" }}>Mission Roadmap</h1>
+          <p style={{ fontSize: 13, color: "#52606D" }}>Your 7-stage financial journey</p>
         </div>
+        <Link href="/mission/new" style={{
+          padding: "10px 20px", background: "#0057D9", color: "#fff",
+          borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: "none",
+        }}>
+          + New Mission
+        </Link>
+      </div>
 
-        {/* Active Mission Detail Card */}
-        {activeMission ? (
-          <div className="card" style={{ marginBottom: 32, border: "1.5px solid #d9e2ec", borderRadius: 20, padding: "28px 32px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    background: "#ebf4ff",
-                    borderRadius: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 26,
-                  }}
-                >
-                  {GOAL_CATEGORY_ICONS[activeMission.goal_category] || "🎯"}
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0052cc", textTransform: "uppercase" }}>
-                      Active Mission
-                    </span>
-                    <span className="badge badge-green">ACTIVE</span>
-                  </div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, color: "#002e6e", margin: 0 }}>
-                    {activeMission.goal_title}
-                  </h2>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                <Link href="/documents" className="btn-secondary" style={{ fontSize: 13, padding: "8px 16px" }}>
-                  Upload Documents →
-                </Link>
-                <Link href="/ai" className="btn-primary" style={{ fontSize: 13, padding: "8px 16px" }}>
-                  Ask AI About Mission 🤖
-                </Link>
-              </div>
-            </div>
-
-            {/* Target Numbers */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-                gap: 16,
-                padding: "18px 22px",
-                background: "#f8fafc",
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                marginBottom: 28,
-              }}
-            >
-              <div>
-                <span className="stat-label">Target Amount</span>
-                <p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#002e6e" }}>
-                  {activeMission.target_amount ? formatAmount(activeMission.target_amount, activeMission.currency) : "—"}
-                </p>
-              </div>
-              <div>
-                <span className="stat-label">Target Timeline</span>
-                <p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#002e6e" }}>
-                  {activeMission.timeline_text || "1 Year"}
-                </p>
-              </div>
-              <div>
-                <span className="stat-label">Destination</span>
-                <p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#002e6e" }}>
-                  {activeMission.destination || "Germany"}
-                </p>
-              </div>
-              <div>
-                <span className="stat-label">Mission Status</span>
-                <p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#00875a" }}>
-                  {activeMission.status}
-                </p>
-              </div>
-            </div>
-
-            {/* SECTION 7: 7 JOURNEY STAGES STEPPER */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: "#002e6e", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                  Journey Stages Roadmap
-                </h3>
-                <span style={{ fontSize: 12.5, color: "#64748b" }}>
-                  Click a stage to inspect details
-                </span>
-              </div>
-
-              {/* Horizontal Stepper */}
-              <div className="journey-stepper">
-                {JOURNEY_STAGES.map((st, i) => (
-                  <div key={st.id} className="stage-item">
-                    <button
-                      onClick={() => setSelectedStage(st.id)}
-                      className={`stage-pill ${st.status === "active" ? "active" : st.status === "completed" ? "completed" : ""}`}
-                      style={{
-                        outline: selectedStage === st.id ? "2px solid #0052cc" : "none",
-                        outlineOffset: 2,
-                      }}
-                    >
-                      <span>{st.status === "completed" ? "✓" : st.icon}</span>
-                      <span>{st.label}</span>
-                    </button>
-                    {i < JOURNEY_STAGES.length - 1 && <span className="stage-divider">→</span>}
-                  </div>
-                ))}
-              </div>
-
-              {/* Interactive Stage Detail View */}
-              {selectedStage && (
-                <div
-                  style={{
-                    marginTop: 18,
-                    padding: "18px 22px",
-                    background: "#f0f7ff",
-                    border: "1.5px solid #b9d9ff",
-                    borderRadius: 14,
-                  }}
-                >
-                  {selectedStage === "goal" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 1: Goal Definition (Completed ✓)</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        Goal "{activeMission.goal_title}" created with ₹12,00,000 target and Germany destination. Extracted by Gemini AI.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "profile" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 2: Financial Profile (Completed ✓)</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        Monthly income, existing EMIs, and liquid savings reported. Completeness is currently at 82%.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "documents" && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0052cc" }}>Stage 3: Document Verification (Current Stage 📍)</h4>
-                        <Link href="/documents" className="btn-primary" style={{ fontSize: 12, padding: "5px 12px" }}>
-                          Review Documents →
-                        </Link>
-                      </div>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        Passport and bank statement verified. Salary slip and offer letter pending user review to become trusted financial data.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "assessment" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 4: Readiness Assessment (In Calculation)</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        Calculates debt-to-income ratio, funding gap analysis, and currency fluctuation risk against Germany study costs.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "options" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 5: Financial Options (Upcoming)</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        FinPath matches you with pre-screened education loans, blocked account partners, and scholarship grants.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "application" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 6: Application & Pre-Approval (Upcoming)</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        1-click submission of verified documents directly to selected banking partners with no duplicate paperwork.
-                      </p>
-                    </div>
-                  )}
-                  {selectedStage === "completion" && (
-                    <div>
-                      <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#002e6e" }}>Stage 7: Mission Completion & Disbursement</h4>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
-                        Funding disbursed, blocked account funded, and pre-departure financial checklist completed.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{ textAlign: "center", padding: "48px 24px" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🎯</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#002e6e" }}>No missions created yet</h2>
-            <p style={{ color: "#64748b", fontSize: 13.5, margin: "0 0 20px" }}>
-              Start your journey by defining what you want to achieve.
-            </p>
-            <Link href="/mission/new" className="btn-primary">
-              Create Your First Mission →
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px" }}>
+        {missions.length === 0 ? (
+          <div style={{
+            background: "#fff", borderRadius: 16, padding: "48px", textAlign: "center",
+            border: "2px dashed #D9E2EC",
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎯</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: "#102A43", marginBottom: 8 }}>No missions yet</h2>
+            <p style={{ color: "#52606D", marginBottom: 20 }}>Create your first financial mission to start your journey.</p>
+            <Link href="/mission/new" style={{
+              display: "inline-block", padding: "12px 28px", background: "#0057D9",
+              color: "#fff", borderRadius: 10, fontWeight: 700, textDecoration: "none",
+            }}>
+              Create First Mission
             </Link>
           </div>
-        )}
-
-        {/* All Missions List */}
-        {missions.length > 1 && (
-          <div>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: "#002e6e", marginBottom: 14 }}>
-              All Financial Missions ({missions.length})
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-              {missions.map((m) => (
-                <div key={m.id} className="card card-hover" style={{ padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                    <span style={{ fontSize: 24 }}>{GOAL_CATEGORY_ICONS[m.goal_category] || "🎯"}</span>
-                    <span className={m.status === "ACTIVE" ? "badge badge-green" : "badge badge-gray"}>{m.status}</span>
-                  </div>
-                  <h4 style={{ fontSize: 16, fontWeight: 700, color: "#002e6e", margin: "0 0 4px" }}>{m.goal_title}</h4>
-                  <p style={{ fontSize: 13, color: "#475569", margin: "0 0 12px" }}>
-                    Target: {m.target_amount ? formatAmount(m.target_amount, m.currency) : "—"} · {m.timeline_text || "1 Year"}
-                  </p>
-                  <Link href={`/mission/${m.id}`} className="btn-ghost" style={{ padding: "4px 8px", fontSize: 12.5, color: "#0052cc" }}>
-                    View Journey →
-                  </Link>
-                </div>
-              ))}
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 24 }}>
+            {/* Mission list */}
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#52606D", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Your Missions
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {missions.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => handleSelectMission(m)}
+                    style={{
+                      background: selectedMission?.id === m.id ? "#EEF4FF" : "#fff",
+                      border: `1.5px solid ${selectedMission?.id === m.id ? "#0057D9" : "#D9E2EC"}`,
+                      borderRadius: 12, padding: "16px", cursor: "pointer", textAlign: "left",
+                      fontFamily: "inherit", width: "100%",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                      <span style={{ fontSize: 20 }}>{GOAL_CATEGORY_ICONS[m.goal_category] || "⭐"}</span>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "#102A43" }}>{m.goal_title}</p>
+                        <p style={{ fontSize: 11, color: "#52606D" }}>
+                          Stage {m.stage}/7 • {m.status}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Mini progress */}
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {MISSION_STAGES.map((s, i) => (
+                        <div key={s.id} style={{
+                          flex: 1, height: 4, borderRadius: 2,
+                          background: i + 1 < m.stage ? "#0057D9" : i + 1 === m.stage ? "#00AEEF" : "#E8F0FE",
+                        }} />
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* Mission detail */}
+            {selectedMission && (
+              <div>
+                {/* Mission header */}
+                <div style={{
+                  background: "#fff", borderRadius: 14, padding: "24px",
+                  border: "1px solid #D9E2EC", marginBottom: 20,
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20 }}>
+                    <div style={{
+                      width: 52, height: 52, background: "#EEF4FF", borderRadius: 14,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+                    }}>
+                      {GOAL_CATEGORY_ICONS[selectedMission.goal_category] || "⭐"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h2 style={{ fontSize: 20, fontWeight: 800, color: "#102A43" }}>{selectedMission.goal_title}</h2>
+                      <p style={{ fontSize: 13, color: "#52606D" }}>
+                        {GOAL_CATEGORY_LABELS[selectedMission.goal_category]} •{" "}
+                        {selectedMission.target_amount ? `₹${formatAmount(selectedMission.target_amount)}` : "Amount TBD"} •{" "}
+                        {selectedMission.timeline_text || "Timeline TBD"}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {readiness && (
+                        <div>
+                          <p style={{ fontSize: 28, fontWeight: 800, color: "#0057D9" }}>{readiness.overall_score.toFixed(0)}%</p>
+                          <p style={{ fontSize: 11, color: "#52606D" }}>Readiness</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* NBA */}
+                  {nba && (
+                    <div style={{
+                      padding: "14px 16px", borderRadius: 10,
+                      background: "#EEF4FF", border: "1px solid #C7D7F5",
+                      display: "flex", alignItems: "center", gap: 12,
+                    }}>
+                      <span style={{ fontSize: 20 }}>{nba.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "#102A43" }}>{nba.action}</p>
+                        <p style={{ fontSize: 12, color: "#52606D" }}>{nba.reason}</p>
+                      </div>
+                      <Link href={nba.target_route} style={{
+                        padding: "8px 16px", background: "#0057D9", color: "#fff",
+                        borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none",
+                      }}>
+                        Go
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                {/* 7-stage roadmap */}
+                <div style={{ background: "#fff", borderRadius: 14, padding: "24px", border: "1px solid #D9E2EC" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#102A43" }}>Journey Roadmap</h3>
+                    {selectedMission.stage < 7 && (
+                      <button
+                        onClick={handleAdvanceStage}
+                        disabled={advancing}
+                        style={{
+                          padding: "8px 18px", background: "#16803C", color: "#fff",
+                          borderRadius: 8, border: "none", cursor: "pointer",
+                          fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+                        }}
+                      >
+                        {advancing ? "Advancing…" : "Advance Stage →"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                    {MISSION_STAGES.map((stage, idx) => {
+                      const stageNum = idx + 1;
+                      const status = getStageStatus(stageNum, selectedMission.stage);
+                      const s = STATUS_STYLE[status];
+                      const isSelected = selectedStageId === stageNum;
+
+                      return (
+                        <div key={stage.id} style={{ display: "flex", gap: 0 }}>
+                          {/* Connector line */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 40 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: "50%",
+                              background: s.dotBg, border: "2px solid #fff",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: "#fff", fontSize: 12, fontWeight: 800, zIndex: 1,
+                            }}>
+                              {status === "completed" ? "✓" : stageNum}
+                            </div>
+                            {idx < MISSION_STAGES.length - 1 && (
+                              <div style={{
+                                width: 2, flex: 1, minHeight: 24,
+                                background: stageNum < selectedMission.stage ? "#0057D9" : "#E8F0FE",
+                                margin: "2px 0",
+                              }} />
+                            )}
+                          </div>
+
+                          {/* Stage card */}
+                          <div
+                            onClick={() => setSelectedStageId(isSelected ? null : stageNum)}
+                            style={{
+                              flex: 1, marginLeft: 12, marginBottom: 12,
+                              padding: "14px 16px", borderRadius: 10,
+                              background: s.bg, border: `1.5px solid ${isSelected ? s.border : "#E8F0FE"}`,
+                              cursor: "pointer", transition: "all 0.15s",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: s.labelColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                  {status === "completed" ? "Complete" : status === "current" ? "In Progress" : "Upcoming"}
+                                </span>
+                                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#102A43", marginTop: 2 }}>{stage.name}</h4>
+                              </div>
+                              <span style={{ fontSize: 16 }}>
+                                {status === "completed" ? "✅" : status === "current" ? "🔵" : "⬜"}
+                              </span>
+                            </div>
+
+                            {isSelected && (
+                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #E8F0FE" }}>
+                                <p style={{ fontSize: 13, color: "#52606D" }}>{stage.description}</p>
+                                {status === "current" && (
+                                  <Link href={
+                                    stageNum === 2 ? "/profile" :
+                                    stageNum === 3 ? "/documents" :
+                                    stageNum === 4 ? "/progress" : "#"
+                                  } style={{
+                                    display: "inline-block", marginTop: 8,
+                                    fontSize: 12, color: "#0057D9", fontWeight: 600, textDecoration: "none",
+                                  }}>
+                                    Continue this stage →
+                                  </Link>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

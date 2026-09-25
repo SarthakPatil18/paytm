@@ -5,11 +5,12 @@ Uses Gemini (or configured LLM) with strict JSON schema output.
 import json
 import logging
 from typing import Optional
-import google.generativeai as genai
 from app.core.config import settings
 from app.schemas.mission import GoalParseResponse
 
 logger = logging.getLogger(__name__)
+
+
 
 GOAL_PARSE_PROMPT = """You are a financial goal understanding assistant for FinPath AI, an Indian fintech platform.
 
@@ -47,11 +48,30 @@ User input: {user_input}
 
 class GoalUnderstandingService:
     def __init__(self):
+        self.model = None
+        self._genai = None
         if settings.LLM_API_KEY:
-            genai.configure(api_key=settings.LLM_API_KEY)
-            self.model = genai.GenerativeModel(settings.LLM_MODEL)
+            try:
+                import google.genai as genai_new
+                client = genai_new.Client(api_key=settings.LLM_API_KEY)
+                self.model = client.models
+                self._model_name = settings.LLM_MODEL
+                self._client = client
+                self._use_new_sdk = True
+                logger.info(f"AI configured: google.genai SDK, model={settings.LLM_MODEL}")
+            except ImportError:
+                try:
+                    import google.generativeai as genai_old
+                    genai_old.configure(api_key=settings.LLM_API_KEY)
+                    self.model = genai_old.GenerativeModel(settings.LLM_MODEL)
+                    self._genai = genai_old
+                    self._use_new_sdk = False
+                    logger.info(f"AI configured: google.generativeai SDK (legacy), model={settings.LLM_MODEL}")
+                except ImportError:
+                    logger.warning("Neither google.genai nor google.generativeai found. Fallback mode.")
+            except Exception as e:
+                logger.warning(f"AI configuration failed: {e}. Fallback mode.")
         else:
-            self.model = None
             logger.warning("No LLM_API_KEY configured. Goal parsing will use fallback mode.")
 
     async def parse_goal(self, text: str) -> GoalParseResponse:
@@ -61,16 +81,12 @@ class GoalUnderstandingService:
 
         try:
             prompt = GOAL_PARSE_PROMPT.format(user_input=text)
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                )
-            )
+            raw = self._generate(prompt)
+            if not raw:
+                return self._fallback_parse(text)
 
-            raw = response.text.strip()
             # Strip markdown code fences if present
+            raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]
                 if raw.startswith("json"):
@@ -154,6 +170,24 @@ class GoalUnderstandingService:
             clarification_questions=[] if category else ["What type of financial goal are you trying to achieve?"]
         )
 
+    def _generate(self, prompt: str) -> Optional[str]:
+        """Internal helper: generate text using whichever SDK is configured."""
+        if not self.model:
+            return None
+        try:
+            if getattr(self, "_use_new_sdk", False):
+                response = self._client.models.generate_content(
+                    model=self._model_name,
+                    contents=prompt,
+                )
+                return response.text
+            else:
+                response = self.model.generate_content(prompt)
+                return response.text
+        except Exception as e:
+            logger.warning(f"LLM generate failed: {e}")
+            return None
+
     async def chat(self, message: str, context: Optional[dict] = None) -> dict:
         """Provide contextual financial journey assistant responses."""
         ctx = context or {}
@@ -176,11 +210,12 @@ User's Current Context:
 
 Answer the user concisely, professionally, and encouragingly. Keep replies under 3 paragraphs with bullet points where helpful.
 User says: {message}"""
-                response = self.model.generate_content(system_prompt)
-                return {
-                    "reply": response.text.strip(),
-                    "suggested_actions": ["Review Next Best Action", "Upload Missing Document", "Update Profile"]
-                }
+                reply_text = self._generate(system_prompt)
+                if reply_text:
+                    return {
+                        "reply": reply_text.strip(),
+                        "suggested_actions": ["Review Next Best Action", "Upload Missing Document", "Update Profile"]
+                    }
             except Exception as e:
                 logger.warning(f"LLM chat failed, using fallback: {e}")
 

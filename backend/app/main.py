@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import create_tables
-from app.api import auth, missions, documents, profile, ai
+from app.api import auth, missions, documents, profile, ai, notifications
 
 
 @asynccontextmanager
@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="FinPath AI API",
-    description="Phase 1 — Financial Journey Platform",
+    description="Financial Journey Platform — Goal-first financial assistance",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -36,13 +36,20 @@ app.include_router(missions.router)
 app.include_router(documents.router)
 app.include_router(profile.router)
 app.include_router(ai.router)
+app.include_router(notifications.router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "FinPath AI API — Phase 1", "status": "running"}
+    return {"message": "FinPath AI API — v1.0", "status": "running"}
 
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    from app.core.config import settings as s
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "ai_mode": "gemini" if s.LLM_API_KEY else "fallback",
+        "environment": s.ENVIRONMENT,
+    }

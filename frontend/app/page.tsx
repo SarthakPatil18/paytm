@@ -1,8 +1,10 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { isAuthenticated } from "@/lib/utils";
+import { parseGoal } from "@/lib/services";
+import type { GoalParseResponse } from "@/types";
 
 const SAMPLE_PROMPTS = [
   "I want to study in Germany next year with ₹12 lakh",
@@ -11,37 +13,76 @@ const SAMPLE_PROMPTS = [
   "Need seed funding of ₹25 lakh for my tech startup next year",
 ];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  education: "🎓",
+  home: "🏠", home_purchase: "🏠",
+  vehicle: "🚗", business: "💼",
+  emergency: "🛡️", travel: "✈️",
+  investment: "📈", healthcare: "🏥", other: "⭐",
+};
+
 export default function LandingPage() {
   const router = useRouter();
   const [isAuth, setIsAuth] = useState(false);
   const [goalInput, setGoalInput] = useState("I want to study in Germany next year with ₹12 lakh");
   const [analyzing, setAnalyzing] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
-  const [analysisStep, setAnalysisStep] = useState(0);
+  const [parsedGoal, setParsedGoal] = useState<GoalParseResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<"idle" | "loading" | "done">("idle");
 
   useEffect(() => {
     setIsAuth(isAuthenticated());
   }, []);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!goalInput.trim()) return;
     setAnalyzing(true);
-    setAnalyzed(false);
-    setAnalysisStep(1);
+    setAiMode("loading");
+    setParsedGoal(null);
+    setError(null);
 
-    setTimeout(() => setAnalysisStep(2), 500);
-    setTimeout(() => setAnalysisStep(3), 1000);
-    setTimeout(() => setAnalysisStep(4), 1500);
-    setTimeout(() => {
+    // If user is not authenticated, we do a lightweight client-side preview
+    // (real parse requires auth — we'll redirect on mission creation)
+    if (!isAuth) {
+      // Simulate analysis for unauthenticated users
+      await new Promise((r) => setTimeout(r, 1200));
+      const preview: GoalParseResponse = {
+        goal_category: detectCategory(goalInput),
+        goal_title: detectTitle(goalInput),
+        destination: detectDestination(goalInput),
+        target_amount: detectAmount(goalInput),
+        currency: "INR",
+        deadline: null,
+        timeline_text: detectTimeline(goalInput),
+        description: goalInput.slice(0, 150),
+        confidence: 0.8,
+        needs_clarification: false,
+        clarification_questions: [],
+      };
+      setParsedGoal(preview);
+      setAiMode("done");
       setAnalyzing(false);
-      setAnalyzed(true);
-    }, 2000);
+      return;
+    }
+
+    try {
+      const result = await parseGoal(goalInput);
+      setParsedGoal(result);
+      setAiMode("done");
+    } catch {
+      setError("Could not connect to AI service. Please try again.");
+      setAiMode("idle");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleStartMission = () => {
-    // Save to session storage for the wizard
     if (typeof window !== "undefined") {
       sessionStorage.setItem("finpath_initial_goal", goalInput);
+      if (parsedGoal) {
+        sessionStorage.setItem("finpath_parsed_goal", JSON.stringify(parsedGoal));
+      }
     }
     if (isAuth) {
       router.push(`/mission/new?text=${encodeURIComponent(goalInput)}`);
@@ -51,70 +92,47 @@ export default function LandingPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#ffffff" }}>
-      {/* Top Header */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 36px",
-          borderBottom: "1px solid #f1f5f9",
-          position: "sticky",
-          top: 0,
-          background: "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(10px)",
-          zIndex: 50,
-        }}
-      >
+    <div style={{ minHeight: "100vh", background: "#ffffff", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+      {/* Navigation */}
+      <nav style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 40px", borderBottom: "1px solid #E8F0FE",
+        position: "sticky", top: 0, background: "rgba(255,255,255,0.97)",
+        backdropFilter: "blur(12px)", zIndex: 50,
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              background: "linear-gradient(135deg, #002e6e 0%, #0052cc 60%, #00baf2 100%)",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 10px rgba(0, 82, 204, 0.25)",
-            }}
-          >
+          <div style={{
+            width: 36, height: 36,
+            background: "linear-gradient(135deg, #003D99 0%, #0057D9 60%, #00AEEF 100%)",
+            borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 12px rgba(0,87,217,0.2)",
+          }}>
             <span style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>F</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#002e6e", letterSpacing: "-0.02em" }}>
-              FinPath
-            </span>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                background: "#e0f2fe",
-                color: "#0284c7",
-                padding: "2px 6px",
-                borderRadius: 4,
-              }}
-            >
-              AI
-            </span>
-          </div>
+          <span style={{ fontSize: 18, fontWeight: 800, color: "#102A43", letterSpacing: "-0.02em" }}>
+            FinPath <span style={{
+              fontSize: 10, fontWeight: 700, background: "#E8F0FE", color: "#0057D9",
+              padding: "2px 6px", borderRadius: 4, verticalAlign: "middle",
+            }}>AI</span>
+          </span>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/demo" className="btn-secondary" style={{ fontSize: 13.5, padding: "8px 16px" }}>
-            🔍 Try Instant Demo
-          </Link>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {isAuth ? (
-            <Link href="/dashboard" className="btn-primary" style={{ fontSize: 13.5, padding: "8px 18px" }}>
-              Dashboard →
+            <Link href="/dashboard" style={{
+              padding: "8px 20px", background: "#0057D9", color: "#fff",
+              borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: "none",
+            }}>
+              Dashboard
             </Link>
           ) : (
             <>
-              <Link href="/login" className="btn-ghost" style={{ fontSize: 13.5 }}>
-                Sign in
+              <Link href="/login" style={{ color: "#52606D", fontWeight: 500, fontSize: 14, textDecoration: "none" }}>
+                Sign In
               </Link>
-              <Link href="/register" className="btn-primary" style={{ fontSize: 13.5, padding: "8px 18px" }}>
+              <Link href="/register" style={{
+                padding: "8px 20px", background: "#0057D9", color: "#fff",
+                borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: "none",
+              }}>
                 Get Started
               </Link>
             </>
@@ -122,420 +140,267 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section
-        style={{
-          maxWidth: 960,
-          margin: "0 auto",
-          padding: "70px 24px 60px",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: "#ebf4ff",
-            color: "#0052cc",
-            padding: "6px 18px",
-            borderRadius: 100,
-            fontSize: 13,
-            fontWeight: 700,
-            marginBottom: 24,
-            border: "1px solid #c8e0ff",
-          }}
-        >
-          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#00baf2" }} />
-          <span>Goal-First Financial Journey Platform</span>
+      {/* Hero */}
+      <section style={{ maxWidth: 720, margin: "0 auto", padding: "80px 24px 48px", textAlign: "center" }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: "#E8F0FE", border: "1px solid #C7D7F5", borderRadius: 20,
+          padding: "6px 16px", marginBottom: 28,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#0057D9" }}>
+            Goal-first financial journey platform
+          </span>
         </div>
 
-        <h1
-          style={{
-            fontSize: "clamp(32px, 5vw, 52px)",
-            fontWeight: 800,
-            color: "#002e6e",
-            lineHeight: 1.15,
-            letterSpacing: "-0.03em",
-            marginBottom: 18,
-          }}
-        >
-          Turn your financial goal into a clear journey.
+        <h1 style={{
+          fontSize: "clamp(32px,5vw,52px)", fontWeight: 800,
+          color: "#102A43", lineHeight: 1.15, marginBottom: 20, letterSpacing: "-0.03em",
+        }}>
+          Turn your financial goal<br />
+          <span style={{ color: "#0057D9" }}>into a clear journey</span>
         </h1>
 
-        <p
-          style={{
-            fontSize: "clamp(16px, 2.5vw, 19px)",
-            color: "#475569",
-            maxWidth: 680,
-            margin: "0 auto 36px",
-            lineHeight: 1.6,
-          }}
-        >
-          FinPath AI understands your goal, organizes your financial information, and guides you through every step.
+        <p style={{ fontSize: 18, color: "#52606D", lineHeight: 1.7, maxWidth: 540, margin: "0 auto 48px" }}>
+          FinPath AI understands your goal, organizes your financial information, and guides you through every step needed to move forward.
         </p>
 
-        {/* Action CTAs */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", marginBottom: 50 }}>
-          <button
-            onClick={handleStartMission}
-            className="btn-primary"
-            style={{ padding: "14px 30px", fontSize: 16, borderRadius: 12 }}
-          >
-            Start Your Financial Journey →
-          </button>
-          <Link
-            href="/demo"
-            className="btn-secondary"
-            style={{ padding: "14px 28px", fontSize: 16, borderRadius: 12 }}
-          >
-            Try Instant Demo
-          </Link>
-        </div>
+        {/* Goal Input Card */}
+        <div style={{
+          background: "#fff", border: "1px solid #D9E2EC", borderRadius: 16,
+          padding: "28px", boxShadow: "0 4px 32px rgba(0,87,217,0.07)", textAlign: "left",
+        }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "#52606D", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            What is your financial goal?
+          </p>
+          <textarea
+            value={goalInput}
+            onChange={(e) => { setGoalInput(e.target.value); setParsedGoal(null); setAiMode("idle"); }}
+            placeholder="Example: I want to study in Germany next year with ₹12 lakh…"
+            rows={3}
+            style={{
+              width: "100%", border: "1.5px solid #D9E2EC", borderRadius: 10,
+              padding: "14px 16px", fontSize: 16, color: "#102A43",
+              background: "#F5F8FC", resize: "none", outline: "none",
+              boxSizing: "border-box", lineHeight: 1.6, fontFamily: "inherit",
+              transition: "border-color 0.2s",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "#0057D9")}
+            onBlur={(e) => (e.target.style.borderColor = "#D9E2EC")}
+          />
 
-        {/* Conversational Goal Input Card */}
-        <div
-          className="card"
-          style={{
-            maxWidth: 760,
-            margin: "0 auto",
-            textAlign: "left",
-            boxShadow: "0 12px 40px rgba(0, 46, 110, 0.08)",
-            border: "1.5px solid #d9e6f7",
-            borderRadius: 20,
-            padding: "28px 32px",
-            background: "#ffffff",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <span style={{ fontSize: 20 }}>💬</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#002e6e" }}>
-              Tell FinPath what you want to achieve:
-            </span>
-          </div>
-
-          <div style={{ position: "relative", marginBottom: 16 }}>
-            <input
-              type="text"
-              value={goalInput}
-              onChange={(e) => {
-                setGoalInput(e.target.value);
-                setAnalyzed(false);
-              }}
-              placeholder="e.g. I want to study in Germany next year with ₹12 lakh"
-              className="input"
-              style={{
-                padding: "16px 20px",
-                fontSize: 15,
-                borderRadius: 12,
-                border: "2px solid #cbd5e1",
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAnalyze();
-              }}
-            />
-          </div>
-
-          {/* Quick chips */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-            {SAMPLE_PROMPTS.map((prompt) => (
+          {/* Sample prompts */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+            {SAMPLE_PROMPTS.map((p) => (
               <button
-                key={prompt}
-                onClick={() => {
-                  setGoalInput(prompt);
-                  setAnalyzed(false);
-                }}
+                key={p}
+                onClick={() => { setGoalInput(p); setParsedGoal(null); setAiMode("idle"); }}
                 style={{
-                  background: "#f1f5f9",
-                  border: "1px solid #e2e8f0",
-                  padding: "5px 12px",
-                  borderRadius: 100,
-                  fontSize: 12,
-                  color: "#475569",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#ebf4ff";
-                  e.currentTarget.style.color = "#0052cc";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f1f5f9";
-                  e.currentTarget.style.color = "#475569";
+                  padding: "5px 12px", border: "1px solid #D9E2EC", borderRadius: 20,
+                  fontSize: 12, color: "#52606D", background: "#F5F8FC",
+                  cursor: "pointer", fontFamily: "inherit",
                 }}
               >
-                {prompt}
+                {p.slice(0, 40)}…
               </button>
             ))}
           </div>
 
-          {/* AI Processing Interaction */}
-          {analyzing && (
-            <div
-              style={{
-                background: "#f0f7ff",
-                borderRadius: 12,
-                padding: "18px 22px",
-                border: "1px solid #b9d9ff",
-                marginBottom: 18,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <div className="spinner" />
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0052cc" }}>
-                  Understanding your goal...
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
-                <div style={{ color: analysisStep >= 1 ? "#00875a" : "#94a3b8", fontWeight: 600 }}>
-                  {analysisStep >= 1 ? "✓ Goal detected" : "○ Detecting goal category..."}
-                </div>
-                <div style={{ color: analysisStep >= 2 ? "#00875a" : "#94a3b8", fontWeight: 600 }}>
-                  {analysisStep >= 2 ? "✓ Target amount detected" : "○ Calculating target amount..."}
-                </div>
-                <div style={{ color: analysisStep >= 3 ? "#00875a" : "#94a3b8", fontWeight: 600 }}>
-                  {analysisStep >= 3 ? "✓ Timeline detected" : "○ Estimating target timeline..."}
-                </div>
-                <div style={{ color: analysisStep >= 4 ? "#00875a" : "#94a3b8", fontWeight: 600 }}>
-                  {analysisStep >= 4 ? "✓ Financial mission ready" : "○ Assembling mission checklist..."}
-                </div>
-              </div>
-            </div>
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing || !goalInput.trim()}
+            style={{
+              marginTop: 16, width: "100%", padding: "14px 0",
+              background: analyzing ? "#7EB3F5" : "#0057D9",
+              color: "#fff", borderRadius: 10, fontWeight: 700,
+              fontSize: 15, border: "none", cursor: analyzing ? "not-allowed" : "pointer",
+              transition: "background 0.2s", fontFamily: "inherit",
+            }}
+          >
+            {analyzing ? "Analysing your goal…" : "Analyse My Goal"}
+          </button>
+
+          {error && (
+            <p style={{ color: "#D64545", fontSize: 13, marginTop: 10, textAlign: "center" }}>{error}</p>
           )}
 
-          {/* Analyzed Confirmation State */}
-          {analyzed && (
-            <div
-              style={{
-                background: "#e6f9f2",
-                borderRadius: 14,
-                padding: "20px 24px",
-                border: "1.5px solid #a8edd6",
-                marginBottom: 20,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ color: "#00875a", fontSize: 18, fontWeight: 800 }}>✓</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#004d33" }}>
-                  Financial Mission Ready to Launch
-                </span>
+          {/* Parsed Result */}
+          {aiMode === "done" && parsedGoal && (
+            <div style={{ marginTop: 20, padding: "20px", background: "#F5F8FC", borderRadius: 12, border: "1px solid #D9E2EC" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span style={{ color: "#16803C", fontSize: 16 }}>✓</span>
+                <span style={{ fontWeight: 700, color: "#102A43", fontSize: 15 }}>Goal understood</span>
+                {parsedGoal.goal_category && (
+                  <span style={{
+                    marginLeft: "auto", padding: "3px 10px", background: "#E8F0FE",
+                    color: "#0057D9", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                  }}>
+                    {CATEGORY_ICONS[parsedGoal.goal_category]} {parsedGoal.goal_category}
+                  </span>
+                )}
               </div>
-              <div
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {parsedGoal.goal_title && (
+                  <InfoRow label="Goal" value={parsedGoal.goal_title} />
+                )}
+                {parsedGoal.target_amount && (
+                  <InfoRow label="Target Amount" value={`₹${parsedGoal.target_amount.toLocaleString("en-IN")}`} />
+                )}
+                {parsedGoal.timeline_text && (
+                  <InfoRow label="Timeline" value={parsedGoal.timeline_text} />
+                )}
+                {parsedGoal.destination && (
+                  <InfoRow label="Destination" value={parsedGoal.destination} />
+                )}
+              </div>
+
+              {parsedGoal.needs_clarification && parsedGoal.clarification_questions.length > 0 && (
+                <div style={{ marginTop: 14, padding: "12px", background: "#FFF8ED", borderRadius: 8, border: "1px solid #F5D9A8" }}>
+                  <p style={{ fontSize: 13, color: "#D9822B", fontWeight: 600, marginBottom: 6 }}>Needs clarification:</p>
+                  {parsedGoal.clarification_questions.map((q, i) => (
+                    <p key={i} style={{ fontSize: 13, color: "#52606D" }}>• {q}</p>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={handleStartMission}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                  gap: 12,
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: "1px solid #bbf2e0",
+                  marginTop: 16, width: "100%", padding: "13px 0",
+                  background: "#16803C", color: "#fff",
+                  borderRadius: 10, fontWeight: 700, fontSize: 15,
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
                 }}
               >
-                <div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#006847", textTransform: "uppercase" }}>Category</span>
-                  <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: "#003824" }}>Education (Germany)</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#006847", textTransform: "uppercase" }}>Target Amount</span>
-                  <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: "#003824" }}>₹12,00,000</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#006847", textTransform: "uppercase" }}>Timeline</span>
-                  <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: "#003824" }}>Next year (1 Year)</p>
-                </div>
-              </div>
+                Create Financial Mission →
+              </button>
             </div>
           )}
+        </div>
+      </section>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            {!analyzed && (
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                className="btn-secondary"
-                style={{ borderRadius: 10, padding: "10px 20px" }}
-              >
-                {analyzing ? "Analyzing..." : "Analyze with AI"}
-              </button>
-            )}
-            <button
-              onClick={handleStartMission}
-              className="btn-primary"
-              style={{ borderRadius: 10, padding: "10px 24px" }}
-            >
-              Create Financial Mission →
-            </button>
+      {/* How it works */}
+      <section style={{ background: "#F5F8FC", padding: "64px 24px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <h2 style={{ textAlign: "center", fontSize: 28, fontWeight: 800, color: "#102A43", marginBottom: 8 }}>
+            How FinPath Works
+          </h2>
+          <p style={{ textAlign: "center", color: "#52606D", marginBottom: 48 }}>
+            A structured 7-stage journey from goal to completion
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+            {[
+              { n: "1", title: "Goal Definition", desc: "Describe your financial goal in plain language" },
+              { n: "2", title: "Financial Profile", desc: "Share your income, savings, and EMI details" },
+              { n: "3", title: "Document Upload", desc: "Upload identity, bank, and income documents" },
+              { n: "4", title: "Readiness Score", desc: "Get a transparent, deterministic readiness score" },
+              { n: "5", title: "Financial Options", desc: "Review products suited to your mission" },
+              { n: "6", title: "Preparation", desc: "Complete your application with guided steps" },
+              { n: "7", title: "Completion", desc: "Mission achieved — your financial journey is complete" },
+            ].map((step) => (
+              <div key={step.n} style={{
+                background: "#fff", borderRadius: 12, padding: "20px",
+                border: "1px solid #D9E2EC", boxShadow: "0 2px 8px rgba(0,87,217,0.04)",
+              }}>
+                <div style={{
+                  width: 32, height: 32, background: "#0057D9", color: "#fff",
+                  borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 800, fontSize: 14, marginBottom: 12,
+                }}>
+                  {step.n}
+                </div>
+                <h3 style={{ fontWeight: 700, color: "#102A43", fontSize: 15, marginBottom: 6 }}>{step.title}</h3>
+                <p style={{ color: "#52606D", fontSize: 13, lineHeight: 1.5 }}>{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 4 Core Capabilities Section */}
-      <section
-        style={{
-          background: "#f8fafd",
-          borderTop: "1px solid #eef2f8",
-          padding: "70px 24px",
-        }}
-      >
-        <div style={{ maxWidth: 1060, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: "#0052cc",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
-            >
-              Core Capabilities
-            </span>
-            <h2
-              style={{
-                fontSize: 32,
-                fontWeight: 800,
-                color: "#002e6e",
-                marginTop: 8,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Why FinPath AI is Different
-            </h2>
-            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 540, margin: "8px auto 0" }}>
-              Instead of pushing individual financial products, FinPath orchestrates your entire financial journey around your goal.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-              gap: 20,
-            }}
-          >
-            {/* Capability 1 */}
-            <div className="card card-hover" style={{ padding: 28 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#ebf4ff",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  marginBottom: 16,
-                  color: "#0052cc",
-                }}
-              >
-                💬
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: "#002e6e", marginBottom: 8 }}>
-                1. Natural Goal Understanding
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6 }}>
-                Speak in your own words. Gemini AI parses your intent, extracts amounts, timelines, and destinations, and clarifies missing gaps.
-              </p>
-            </div>
-
-            {/* Capability 2 */}
-            <div className="card card-hover" style={{ padding: 28 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#e0f2fe",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  marginBottom: 16,
-                  color: "#0284c7",
-                }}
-              >
-                🎯
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: "#002e6e", marginBottom: 8 }}>
-                2. Financial Mission
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6 }}>
-                Your goal transforms into a dedicated Financial Mission with readiness milestones, document checklists, and target dates.
-              </p>
-            </div>
-
-            {/* Capability 3 */}
-            <div className="card card-hover" style={{ padding: 28 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#e6f9f2",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  marginBottom: 16,
-                  color: "#00875a",
-                }}
-              >
-                📄
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: "#002e6e", marginBottom: 8 }}>
-                3. Intelligent Document Processing
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6 }}>
-                Drop passports, bank statements, or offer letters. OCR extracts verified parameters with confidence scores for your review.
-              </p>
-            </div>
-
-            {/* Capability 4 */}
-            <div className="card card-hover" style={{ padding: 28 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#fef3c7",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  marginBottom: 16,
-                  color: "#b45309",
-                }}
-              >
-                ⚡
-              </div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: "#002e6e", marginBottom: 8 }}>
-                4. Adaptive Journey & Next Best Action
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6 }}>
-                Never wonder what to do next. The system dynamically pinpoints the highest-impact action to move your mission forward.
-              </p>
-            </div>
-          </div>
+      {/* CTA */}
+      <section style={{ padding: "64px 24px", textAlign: "center" }}>
+        <h2 style={{ fontSize: 28, fontWeight: 800, color: "#102A43", marginBottom: 16 }}>
+          Ready to start your financial journey?
+        </h2>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link href={isAuth ? "/dashboard" : "/register"} style={{
+            padding: "14px 32px", background: "#0057D9", color: "#fff",
+            borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: "none",
+          }}>
+            {isAuth ? "Go to Dashboard" : "Start Free"}
+          </Link>
+          <Link href="/demo" style={{
+            padding: "14px 32px", background: "#F5F8FC", color: "#0057D9",
+            borderRadius: 10, fontWeight: 700, fontSize: 16, textDecoration: "none",
+            border: "1.5px solid #0057D9",
+          }}>
+            Try Demo
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer
-        style={{
-          borderTop: "1px solid #e2e8f0",
-          padding: "36px 24px",
-          textAlign: "center",
-          color: "#94a3b8",
-          fontSize: 13,
-        }}
-      >
-        <p style={{ margin: "0 0 6px" }}>
-          FinPath AI © 2026 — Phase 1 Financial Journey Platform
-        </p>
-        <p style={{ margin: 0, fontSize: 12 }}>
-          Empowering goal-first financial decision making with AI
-        </p>
+      <footer style={{
+        borderTop: "1px solid #D9E2EC", padding: "24px 40px",
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12,
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#102A43" }}>FinPath AI</span>
+        <span style={{ fontSize: 13, color: "#52606D" }}>
+          © 2026 FinPath AI. Financial journey platform.
+        </span>
       </footer>
     </div>
   );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: "10px 12px", background: "#fff", borderRadius: 8, border: "1px solid #E8F0FE" }}>
+      <p style={{ fontSize: 11, color: "#52606D", fontWeight: 600, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+      <p style={{ fontSize: 14, color: "#102A43", fontWeight: 700 }}>{value}</p>
+    </div>
+  );
+}
+
+// Lightweight client-side fallbacks for unauthenticated preview
+function detectCategory(text: string): string {
+  const t = text.toLowerCase();
+  if (/study|education|university|college|degree/.test(t)) return "education";
+  if (/house|home|flat|apartment/.test(t)) return "home";
+  if (/car|vehicle|bike/.test(t)) return "vehicle";
+  if (/business|startup/.test(t)) return "business";
+  if (/emergency|fund/.test(t)) return "emergency";
+  return "other";
+}
+function detectTitle(text: string): string {
+  const cat = detectCategory(text);
+  const titles: Record<string, string> = {
+    education: "Education Goal",
+    home: "Home Purchase",
+    vehicle: "Vehicle Purchase",
+    business: "Business Goal",
+    emergency: "Emergency Fund",
+    other: "Financial Goal",
+  };
+  return titles[cat] || "Financial Goal";
+}
+function detectDestination(text: string): string | null {
+  const countries = ["germany", "usa", "uk", "canada", "australia", "france", "singapore"];
+  const t = text.toLowerCase();
+  for (const c of countries) if (t.includes(c)) return c.charAt(0).toUpperCase() + c.slice(1);
+  return null;
+}
+function detectAmount(text: string): number | null {
+  const lakh = text.match(/(\d+(?:\.\d+)?)\s*lakh/i);
+  if (lakh) return parseFloat(lakh[1]) * 100000;
+  const crore = text.match(/(\d+(?:\.\d+)?)\s*crore/i);
+  if (crore) return parseFloat(crore[1]) * 10000000;
+  return null;
+}
+function detectTimeline(text: string): string | null {
+  if (/next year/i.test(text)) return "Next year";
+  if (/this year/i.test(text)) return "This year";
+  if (/6 months/i.test(text)) return "6 months";
+  if (/(\d+)\s*year/i.test(text)) return text.match(/(\d+)\s*year/i)![0];
+  return null;
 }

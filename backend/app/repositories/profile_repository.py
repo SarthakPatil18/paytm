@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from typing import Optional
 from app.models.profile import FinancialProfile
 
@@ -13,6 +13,17 @@ class ProfileRepository:
             select(FinancialProfile).where(FinancialProfile.user_id == user_id)
         )
         return result.scalar_one_or_none()
+
+    # Keep legacy alias
+    async def get_or_create(self, user_id: int) -> FinancialProfile:
+        existing = await self.get_by_user_id(user_id)
+        if existing:
+            return existing
+        profile = FinancialProfile(user_id=user_id)
+        self.db.add(profile)
+        await self.db.flush()
+        await self.db.refresh(profile)
+        return profile
 
     async def create_or_update(self, user_id: int, **fields) -> FinancialProfile:
         existing = await self.get_by_user_id(user_id)

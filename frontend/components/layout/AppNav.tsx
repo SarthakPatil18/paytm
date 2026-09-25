@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { useEffect, useState, useRef } from "react";
+import { getNotificationSummary, markNotificationRead, markAllNotificationsRead } from "@/lib/services";
+import type { Notification, NotificationSummary } from "@/types";
 
 interface NavItem {
   label: string;
@@ -15,64 +17,80 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", id: "nav-dashboard", icon: "📊" },
   { label: "Missions", href: "/missions", id: "nav-missions", icon: "🎯" },
   { label: "Documents", href: "/documents", id: "nav-documents", icon: "📁" },
-  { label: "Financial Profile", href: "/profile", id: "nav-profile", icon: "👤" },
+  { label: "Profile", href: "/profile", id: "nav-profile", icon: "👤" },
   { label: "AI Assistant", href: "/ai", id: "nav-ai", icon: "🤖" },
   { label: "Progress", href: "/progress", id: "nav-progress", icon: "📈" },
 ];
 
 const MOBILE_NAV_ITEMS = [
-  { label: "Home", href: "/dashboard", icon: "🏠" },
+  { label: "Home", href: "/dashboard", icon: "📊" },
   { label: "Missions", href: "/missions", icon: "🎯" },
   { label: "Documents", href: "/documents", icon: "📁" },
   { label: "AI", href: "/ai", icon: "🤖" },
   { label: "Profile", href: "/profile", icon: "👤" },
 ];
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    title: "Document Verification Required",
-    desc: "Your salary slip was parsed. Please verify the extracted fields to confirm accuracy.",
-    time: "10m ago",
-    unread: true,
-    href: "/documents",
-    type: "warning",
-  },
-  {
-    id: 2,
-    title: "Profile 82% Complete",
-    desc: "Add monthly investment details to reach 100% and unlock lower loan rates.",
-    time: "2h ago",
-    unread: true,
-    href: "/profile",
-    type: "info",
-  },
-  {
-    id: 3,
-    title: "Mission Milestone Ready",
-    desc: "Germany Education Mission readiness is at 73%. Funding options are calculating.",
-    time: "1d ago",
-    unread: false,
-    href: "/progress",
-    type: "success",
-  },
-];
+const NOTIF_TYPE_COLORS: Record<string, string> = {
+  document_review: "#D9822B",
+  profile_incomplete: "#0057D9",
+  milestone: "#16803C",
+  deadline: "#D64545",
+  action: "#0057D9",
+};
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default function AppNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout, initialize } = useAuthStore();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [notifSummary, setNotifSummary] = useState<NotificationSummary | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  // Click outside listener for notifications
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+    if (user) loadNotifications();
+  }, [user]);
+
+  async function loadNotifications() {
+    try {
+      const summary = await getNotificationSummary();
+      setNotifSummary(summary);
+    } catch {
+      // Silently fail — notifications are non-critical
+    }
+  }
+
+  async function handleMarkRead(id: number) {
+    try {
+      await markNotificationRead(id);
+      await loadNotifications();
+    } catch {}
+  }
+
+  async function handleMarkAllRead() {
+    try {
+      await markAllNotificationsRead();
+      await loadNotifications();
+    } catch {}
+  }
+
+  // Click outside to close notification panel
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setShowNotifications(false);
       }
     }
@@ -80,256 +98,225 @@ export default function AppNav() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+  const handleLogout = () => {
+    logout();
+    router.push("/");
   };
+
+  const unreadCount = notifSummary?.unread_count ?? 0;
 
   return (
     <>
-      {/* Top Navbar */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 28px",
-          height: 64,
-          background: "#ffffff",
-          borderBottom: "1px solid #e2e8f0",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          boxShadow: "0 1px 4px rgba(0, 46, 110, 0.03)",
-        }}
-      >
-        {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          <Link
-            href="/dashboard"
-            style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}
-          >
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                background: "linear-gradient(135deg, #002e6e 0%, #0052cc 60%, #00baf2 100%)",
-                borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 2px 8px rgba(0, 82, 204, 0.25)",
-              }}
-            >
-              <span style={{ color: "#ffffff", fontSize: 16, fontWeight: 800 }}>F</span>
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 17, fontWeight: 800, color: "#002e6e", letterSpacing: "-0.02em" }}>
-                  FinPath
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: "#e0f2fe",
-                    color: "#0369a1",
-                    padding: "1px 6px",
-                    borderRadius: 4,
-                  }}
-                >
-                  AI
-                </span>
-              </div>
-            </div>
-          </Link>
-
-          {/* Desktop Navigation Links */}
-          <div className="desktop-nav-links" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href || (item.href === "/missions" && pathname.startsWith("/mission"));
-              return (
-                <Link
-                  key={item.id}
-                  id={item.id}
-                  href={item.href}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 8,
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    color: isActive ? "#0052cc" : "#475569",
-                    background: isActive ? "#ebf4ff" : "transparent",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+      {/* Desktop Top Nav */}
+      <nav style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 28px", height: 60,
+        background: "#fff", borderBottom: "1px solid #D9E2EC",
+        position: "sticky", top: 0, zIndex: 100,
+        boxShadow: "0 1px 4px rgba(0,87,217,0.06)",
+      }}>
+        {/* Logo */}
+        <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+          <div style={{
+            width: 34, height: 34,
+            background: "linear-gradient(135deg, #003D99 0%, #0057D9 60%, #00AEEF 100%)",
+            borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 10px rgba(0,87,217,0.2)",
+          }}>
+            <span style={{ color: "#fff", fontSize: 17, fontWeight: 800 }}>F</span>
           </div>
-        </div>
+          <span style={{ fontSize: 17, fontWeight: 800, color: "#102A43", letterSpacing: "-0.02em" }}>
+            FinPath{" "}
+            <span style={{
+              fontSize: 10, fontWeight: 700, background: "#E8F0FE", color: "#0057D9",
+              padding: "2px 6px", borderRadius: 4,
+            }}>AI</span>
+          </span>
+        </Link>
 
-        {/* Right Actions: Notifications & User */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {/* Notifications Dropdown */}
-          <div style={{ position: "relative" }} ref={notifRef}>
-            <button
-              id="notif-btn"
-              className="notif-bell"
-              onClick={() => setShowNotifications(!showNotifications)}
-              title="Notifications"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              {unreadCount > 0 && <span className="notif-badge" />}
-            </button>
-
-            {showNotifications && (
-              <div
+        {/* Nav Links */}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                id={item.id}
                 style={{
-                  position: "absolute",
-                  right: 0,
-                  top: 50,
-                  width: 340,
-                  background: "#ffffff",
-                  borderRadius: 14,
-                  boxShadow: "0 12px 35px rgba(0, 46, 110, 0.15), 0 2px 8px rgba(0,0,0,0.06)",
-                  border: "1px solid #e2e8f0",
-                  zIndex: 100,
-                  overflow: "hidden",
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "7px 14px", borderRadius: 8,
+                  fontSize: 13, fontWeight: isActive ? 700 : 500,
+                  color: isActive ? "#0057D9" : "#52606D",
+                  background: isActive ? "#E8F0FE" : "transparent",
+                  textDecoration: "none", transition: "all 0.15s",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "14px 16px",
-                    borderBottom: "1px solid #f1f5f9",
-                    background: "#f8fafc",
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#002e6e" }}>
-                    Notifications ({unreadCount} new)
-                  </span>
+                <span style={{ fontSize: 14 }}>{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Right: Notifications + User */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Notification bell */}
+          <div ref={notifRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) loadNotifications(); }}
+              style={{
+                width: 36, height: 36, borderRadius: 8, border: "1px solid #D9E2EC",
+                background: "#F5F8FC", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🔔</span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "#D64545", color: "#fff",
+                  borderRadius: "50%", width: 18, height: 18,
+                  fontSize: 10, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "2px solid #fff",
+                }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications dropdown */}
+            {showNotifications && (
+              <div style={{
+                position: "absolute", top: 44, right: 0, width: 340,
+                background: "#fff", border: "1px solid #D9E2EC", borderRadius: 14,
+                boxShadow: "0 8px 32px rgba(0,87,217,0.12)", zIndex: 200, overflow: "hidden",
+              }}>
+                <div style={{
+                  padding: "14px 16px", borderBottom: "1px solid #E8F0FE",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: "#102A43" }}>Notifications</span>
                   {unreadCount > 0 && (
                     <button
-                      onClick={markAllRead}
+                      onClick={handleMarkAllRead}
                       style={{
-                        background: "none",
-                        border: "none",
-                        fontSize: 12,
-                        color: "#0052cc",
-                        fontWeight: 600,
-                        cursor: "pointer",
+                        fontSize: 12, color: "#0057D9", background: "none",
+                        border: "none", cursor: "pointer", fontWeight: 600,
                       }}
                     >
                       Mark all read
                     </button>
                   )}
                 </div>
-
-                <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                  {notifications.map((notif) => (
-                    <Link
-                      key={notif.id}
-                      href={notif.href}
-                      onClick={() => setShowNotifications(false)}
-                      style={{
-                        display: "block",
-                        padding: "12px 16px",
-                        borderBottom: "1px solid #f1f5f9",
-                        textDecoration: "none",
-                        background: notif.unread ? "#f0f7ff" : "#ffffff",
-                        transition: "background 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-                          {notif.title}
-                        </span>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{notif.time}</span>
+                <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                  {!notifSummary || notifSummary.notifications.length === 0 ? (
+                    <div style={{ padding: "24px", textAlign: "center", color: "#52606D", fontSize: 13 }}>
+                      No notifications yet
+                    </div>
+                  ) : (
+                    notifSummary.notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => { handleMarkRead(n.id); setShowNotifications(false); if (n.related_resource) router.push(`/${n.related_resource}s`); }}
+                        style={{
+                          padding: "12px 16px", borderBottom: "1px solid #F0F4F8",
+                          cursor: "pointer", background: n.is_read ? "#fff" : "#F5F8FC",
+                          display: "flex", gap: 10, alignItems: "flex-start",
+                        }}
+                      >
+                        <div style={{
+                          width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginTop: 4,
+                          background: n.is_read ? "transparent" : (NOTIF_TYPE_COLORS[n.type] || "#0057D9"),
+                        }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 13, fontWeight: n.is_read ? 500 : 700, color: "#102A43", marginBottom: 2 }}>
+                            {n.title}
+                          </p>
+                          <p style={{ fontSize: 12, color: "#52606D", lineHeight: 1.4 }}>{n.message}</p>
+                          <p style={{ fontSize: 11, color: "#A0AEC0", marginTop: 4 }}>{timeAgo(n.created_at)}</p>
+                        </div>
                       </div>
-                      <p style={{ fontSize: 12, color: "#475569", margin: 0, lineHeight: 1.4 }}>
-                        {notif.desc}
-                      </p>
-                    </Link>
-                  ))}
+                    ))
+                  )}
+                </div>
+                <div style={{ padding: "10px 16px", borderTop: "1px solid #E8F0FE" }}>
+                  <Link href="/notifications" onClick={() => setShowNotifications(false)} style={{
+                    fontSize: 12, color: "#0057D9", textDecoration: "none", fontWeight: 600,
+                  }}>
+                    View all notifications →
+                  </Link>
                 </div>
               </div>
             )}
           </div>
 
-          {/* User Profile / Menu */}
-          {user ? (
+          {/* User info */}
+          {user && (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  background: "#ebf4ff",
-                  borderRadius: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "#0052cc",
-                  border: "1px solid #c8e0ff",
-                }}
-              >
-                {user.full_name ? user.full_name.charAt(0).toUpperCase() : "U"}
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%",
+                background: "linear-gradient(135deg, #0057D9, #00AEEF)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 800, fontSize: 14,
+              }}>
+                {user.full_name?.charAt(0).toUpperCase()}
               </div>
-              <span style={{ fontSize: 13.5, color: "#1e293b", fontWeight: 600 }} className="desktop-nav-links">
-                {user.full_name ? user.full_name.split(" ")[0] : "Account"}
-              </span>
-              <button
-                id="nav-logout"
-                onClick={logout}
-                className="btn-ghost"
-                style={{ fontSize: 12.5, padding: "6px 10px" }}
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link href="/login" className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
-                Sign in
-              </Link>
-              <Link href="/register" className="btn-primary" style={{ padding: "7px 16px", fontSize: 13 }}>
-                Get Started
-              </Link>
+              <div style={{ lineHeight: 1.2 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#102A43" }}>{user.full_name}</p>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    fontSize: 11, color: "#52606D", background: "none",
+                    border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit",
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
           )}
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="mobile-nav">
-        {MOBILE_NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || (item.href === "/missions" && pathname.startsWith("/mission"));
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`mobile-nav-item ${isActive ? "active" : ""}`}
-            >
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
+      {/* Mobile Bottom Nav */}
+      <nav style={{
+        display: "none",
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "#fff", borderTop: "1px solid #D9E2EC",
+        zIndex: 100, padding: "6px 0 calc(6px + env(safe-area-inset-bottom))",
+      }}
+        id="mobile-nav"
+      >
+        <div style={{ display: "flex", justifyContent: "space-around" }}>
+          {MOBILE_NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  gap: 2, padding: "6px 12px", textDecoration: "none",
+                  color: isActive ? "#0057D9" : "#52606D",
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{item.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500 }}>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <style>{`
+        @media (max-width: 768px) {
+          nav:first-of-type { display: none !important; }
+          #mobile-nav { display: block !important; }
+        }
+      `}</style>
     </>
   );
 }

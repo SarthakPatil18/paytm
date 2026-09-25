@@ -12,9 +12,12 @@ class FinancialProfile(Base):
     monthly_expenses = Column(Float, nullable=True)
     savings = Column(Float, nullable=True)
     existing_emi = Column(Float, nullable=True)
+    monthly_investments = Column(Float, nullable=True)
+    dependents = Column(Integer, nullable=True)
 
     income_source = Column(String, nullable=True)
     employment_status = Column(String, nullable=True)
+    employment_experience_years = Column(Float, nullable=True)
 
     currency = Column(String, default="INR")
 

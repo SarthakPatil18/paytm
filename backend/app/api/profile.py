@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -10,6 +10,19 @@ from app.schemas.profile import ProfileResponse, ProfileUpdate
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
 
+PROFILE_RESPONSE_FIELDS = [
+    "id", "user_id", "monthly_income", "monthly_expenses",
+    "savings", "existing_emi", "monthly_investments", "dependents",
+    "income_source", "employment_status", "employment_experience_years",
+    "currency", "updated_at"
+]
+
+
+def _build_profile_response(profile, completion: float) -> ProfileResponse:
+    data = {col: getattr(profile, col, None) for col in PROFILE_RESPONSE_FIELDS}
+    data["completion_percentage"] = completion
+    return ProfileResponse(**data)
+
 
 @router.get("/", response_model=ProfileResponse)
 async def get_profile(
@@ -20,39 +33,17 @@ async def get_profile(
     profile = await profile_repo.get_by_user_id(current_user.id)
 
     if not profile:
-        # Return empty profile
-        from app.models.profile import FinancialProfile
         from datetime import datetime
-        empty = FinancialProfile(
-            id=0,
-            user_id=current_user.id,
-            currency="INR",
-            updated_at=datetime.utcnow()
-        )
         return ProfileResponse(
             id=0,
             user_id=current_user.id,
-            monthly_income=None,
-            monthly_expenses=None,
-            savings=None,
-            existing_emi=None,
-            income_source=None,
-            employment_status=None,
             currency="INR",
             completion_percentage=0.0,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
 
     completion = ProfileRepository.calculate_completion(profile)
-    response_data = {
-        **{col: getattr(profile, col) for col in [
-            "id", "user_id", "monthly_income", "monthly_expenses",
-            "savings", "existing_emi", "income_source", "employment_status",
-            "currency", "updated_at"
-        ]},
-        "completion_percentage": completion
-    }
-    return ProfileResponse(**response_data)
+    return _build_profile_response(profile, completion)
 
 
 @router.patch("/", response_model=ProfileResponse)
@@ -75,12 +66,8 @@ async def update_profile(
         metadata={"updated_fields": list(update_dict.keys())}
     )
 
+    await db.commit()
+    await db.refresh(profile)
+
     completion = ProfileRepository.calculate_completion(profile)
-    return ProfileResponse(
-        **{col: getattr(profile, col) for col in [
-            "id", "user_id", "monthly_income", "monthly_expenses",
-            "savings", "existing_emi", "income_source", "employment_status",
-            "currency", "updated_at"
-        ]},
-        completion_percentage=completion
-    )
+    return _build_profile_response(profile, completion)

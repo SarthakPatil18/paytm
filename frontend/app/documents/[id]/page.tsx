@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppNav from "@/components/layout/AppNav";
-import { getDocument, getExtraction, updateExtraction, confirmExtraction, setDocumentType } from "@/lib/services";
+import { getDocument, getExtraction, updateExtraction, confirmExtraction, setDocumentType, deleteDocument } from "@/lib/services";
 import type { Document, DocumentExtraction } from "@/types";
 import { DOCUMENT_TYPE_LABELS } from "@/types";
 import { getDocumentStatusLabel, getDocumentStatusColor, getDocumentStatusIcon } from "@/lib/utils";

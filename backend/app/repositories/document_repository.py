@@ -34,3 +34,8 @@ class DocumentRepository:
             select(DocumentExtraction).where(DocumentExtraction.document_id == document_id)
         )
         return result.scalar_one_or_none()
+
+    async def delete(self, document: Document) -> None:
+        await self.db.delete(document)
+        await self.db.flush()
+

@@ -1,257 +1,254 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import AppNav from "@/components/layout/AppNav";
-
-const MILESTONES = [
-  {
-    id: 1,
-    title: "Financial Goal Created",
-    status: "completed",
-    date: "14 Sep 2026",
-    desc: "Goal 'Study in Germany' established with ₹12,00,000 target and 1-year timeline.",
-    icon: "🎯",
-  },
-  {
-    id: 2,
-    title: "Financial Profile Completed",
-    status: "completed",
-    date: "18 Sep 2026",
-    desc: "Monthly income ₹75,000, savings ₹4,20,000, and existing obligations logged.",
-    icon: "👤",
-  },
-  {
-    id: 3,
-    title: "Passport ID Verified",
-    status: "completed",
-    date: "20 Sep 2026",
-    desc: "Identity verified for international student eligibility.",
-    icon: "🛂",
-  },
-  {
-    id: 4,
-    title: "Bank Statement Verified",
-    status: "completed",
-    date: "21 Sep 2026",
-    desc: "6-month liquid balance of ₹3,45,000 verified with HDFC Bank statement.",
-    icon: "🏦",
-  },
-  {
-    id: 5,
-    title: "Salary Slip Verification",
-    status: "active",
-    date: "Action Required",
-    desc: "AI extracted income fields. User confirmation needed to complete verification.",
-    icon: "💼",
-  },
-  {
-    id: 6,
-    title: "Funding Plan & Loan Assessment",
-    status: "pending",
-    date: "Upcoming Milestone",
-    desc: "Automated calculation of gap funding, collateral options, and interest subsidy.",
-    icon: "📊",
-  },
-  {
-    id: 7,
-    title: "Lender Application & Blocked Account",
-    status: "pending",
-    date: "Upcoming Milestone",
-    desc: "1-click direct submission of verified dossier to partner banks and German blocked account.",
-    icon: "📝",
-  },
-];
+import { useRouter } from "next/navigation";
+import { isAuthenticated, formatAmount } from "@/lib/utils";
+import { listMissions, getProfile, listDocuments, getGlobalReadiness, getGlobalNBA } from "@/lib/services";
+import type { FinancialMission, FinancialProfile, Document, ReadinessReport, NBAAction } from "@/types";
+import { MISSION_STAGES } from "@/types";
 
 export default function ProgressPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [mission, setMission] = useState<FinancialMission | null>(null);
+  const [profile, setProfile] = useState<FinancialProfile | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
+  const [nba, setNba] = useState<NBAAction | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated()) { router.replace("/login"); return; }
+    loadAll();
+  }, []);
+
+  async function loadAll() {
+    try {
+      const [missions, p, docs, r, n] = await Promise.all([
+        listMissions(),
+        getProfile(),
+        listDocuments(),
+        getGlobalReadiness().catch(() => null),
+        getGlobalNBA().catch(() => null),
+      ]);
+      const active = missions.find((m) => m.status === "ACTIVE") || missions[0] || null;
+      setMission(active);
+      setProfile(p);
+      setDocuments(docs);
+      setReadiness(r);
+      setNba(n);
+    } catch {
+      // silently handled
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const confirmedDocs = documents.filter((d) => d.processing_status === "confirmed");
+  const pendingDocs = documents.filter((d) => ["review_required", "extracted"].includes(d.processing_status));
+  const uploadedDocs = documents.filter((d) => ["uploaded", "processing"].includes(d.processing_status));
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#F5F8FC", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#52606D" }}>Loading progress…</p>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f4f6fb", paddingBottom: 80 }}>
-      <AppNav />
+    <div style={{ minHeight: "100vh", background: "#F5F8FC" }}>
+      {/* Header */}
+      <div style={{
+        background: "#fff", borderBottom: "1px solid #D9E2EC",
+        padding: "20px 32px",
+      }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#102A43" }}>Progress Dashboard</h1>
+        <p style={{ fontSize: 13, color: "#52606D" }}>Your complete financial journey status</p>
+      </div>
 
-      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "32px 24px" }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#0052cc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Journey Tracking
-            </span>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: "#002e6e", margin: "4px 0 0", letterSpacing: "-0.02em" }}>
-              Mission Progress Dashboard
-            </h1>
-            <p style={{ color: "#475569", fontSize: 14, margin: "4px 0 0" }}>
-              Track completed milestones, current bottlenecks, and upcoming application steps.
-            </p>
-          </div>
-          <Link href="/documents" className="btn-primary" style={{ padding: "10px 20px" }}>
-            Resolve Next Action →
-          </Link>
-        </div>
-
-        {/* Readiness Overview Banner */}
-        <div
-          className="card"
-          style={{
-            marginBottom: 28,
-            background: "linear-gradient(135deg, #002e6e 0%, #0043a8 70%, #0052cc 100%)",
-            color: "#ffffff",
-            borderRadius: 20,
-            padding: "30px 34px",
-            boxShadow: "0 10px 30px rgba(0, 46, 110, 0.15)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20 }}>
-            <div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Active Mission: Study in Germany
-              </span>
-              <h2 style={{ fontSize: 26, fontWeight: 800, margin: "6px 0 8px" }}>
-                73% Journey Readiness
-              </h2>
-              <p style={{ color: "#e2e8f0", fontSize: 14, maxWidth: 520, margin: 0 }}>
-                You have verified 4 critical milestones. Confirming your salary slip will raise your readiness score to 86%.
-              </p>
-            </div>
-
-            <div style={{ textAlign: "right" }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 90,
-                  height: 90,
-                  borderRadius: "50%",
-                  border: "6px solid #00baf2",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  fontSize: 26,
-                  fontWeight: 800,
-                }}
-              >
-                73%
+      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 24px" }}>
+        {/* Overall readiness ring */}
+        <div style={{
+          background: "#fff", borderRadius: 14, padding: "28px",
+          border: "1px solid #D9E2EC", marginBottom: 24,
+          display: "flex", gap: 32, alignItems: "center", flexWrap: "wrap",
+        }}>
+          {/* Score display */}
+          <div style={{ textAlign: "center", minWidth: 140 }}>
+            <div style={{
+              width: 120, height: 120, margin: "0 auto 12px",
+              borderRadius: "50%",
+              background: `conic-gradient(#0057D9 ${(readiness?.overall_score || 0) * 3.6}deg, #E8F0FE 0deg)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              position: "relative",
+            }}>
+              <div style={{
+                width: 90, height: 90, borderRadius: "50%",
+                background: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                flexDirection: "column",
+              }}>
+                <span style={{ fontSize: 26, fontWeight: 800, color: "#0057D9" }}>
+                  {(readiness?.overall_score || 0).toFixed(0)}%
+                </span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* 2-Column: Completed vs Pending Actions */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24, marginBottom: 32 }}>
-          {/* Completed Actions */}
-          <div className="card">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <span style={{ color: "#00875a", fontSize: 18, fontWeight: 800 }}>✓</span>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#002e6e", margin: 0 }}>
-                Completed Actions (4)
-              </h3>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #00b074" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>Financial Goal Defined</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Target amount: ₹12,00,000 · Timeline: 1 Year</span>
-              </div>
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #00b074" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>Profile Completed (82%)</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Verified monthly salary and liquid savings</span>
-              </div>
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #00b074" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>Passport Document Verified</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>OCR extraction approved and secured</span>
-              </div>
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #00b074" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>Bank Statement Verified</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>6 months balance records validated</span>
-              </div>
-            </div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "#102A43" }}>Financial Readiness</p>
+            <p style={{ fontSize: 12, color: "#52606D" }}>Deterministic score</p>
           </div>
 
-          {/* Pending Actions */}
-          <div className="card">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <span style={{ color: "#b45309", fontSize: 18, fontWeight: 800 }}>⚡</span>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#002e6e", margin: 0 }}>
-                Pending Actions & Next Steps (3)
-              </h3>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ padding: "12px 14px", background: "#fffbeb", borderRadius: 10, borderLeft: "4px solid #f59e0b" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-                  <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: "#92400e" }}>→ Salary Slip Verification</p>
-                  <Link href="/documents" className="btn-primary" style={{ padding: "3px 10px", fontSize: 11, background: "#f59e0b" }}>
-                    Verify Now
-                  </Link>
+          <div style={{ flex: 1 }}>
+            {readiness ? (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#102A43", marginBottom: 14 }}>Score Breakdown</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {readiness.components.map((c) => (
+                    <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 12, color: "#52606D", width: 160, flexShrink: 0 }}>{c.name}</span>
+                      <div style={{ flex: 1, background: "#E8F0FE", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 4, width: `${c.score}%`,
+                          background: c.score >= 80 ? "#16803C" : c.score >= 50 ? "#D9822B" : "#D64545",
+                          transition: "width 0.6s ease",
+                        }} />
+                      </div>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, width: 36, textAlign: "right",
+                        color: c.score >= 80 ? "#16803C" : c.score >= 50 ? "#D9822B" : "#D64545",
+                      }}>{c.score.toFixed(0)}%</span>
+                    </div>
+                  ))}
                 </div>
-                <span style={{ fontSize: 12, color: "#78350f" }}>Review AI extracted salary figures to complete documentation</span>
-              </div>
-
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #cbd5e1" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#475569" }}>○ Funding Plan Assessment</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Locked until document verification is complete</span>
-              </div>
-
-              <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, borderLeft: "4px solid #cbd5e1" }}>
-                <p style={{ margin: "0 0 2px", fontSize: 13.5, fontWeight: 700, color: "#475569" }}>○ Loan Application Submission</p>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Direct digital application to banking partners</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chronological Milestones Timeline */}
-        <h3 style={{ fontSize: 18, fontWeight: 800, color: "#002e6e", marginBottom: 20 }}>
-          Milestone Timeline
-        </h3>
-
-        <div className="card" style={{ padding: "28px 32px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {MILESTONES.map((m, idx) => (
-              <div key={m.id} style={{ display: "flex", gap: 18, position: "relative" }}>
-                {/* Node icon */}
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background:
-                      m.status === "completed"
-                        ? "#e6f9f2"
-                        : m.status === "active"
-                        ? "#fef3c7"
-                        : "#f1f5f9",
-                    color:
-                      m.status === "completed"
-                        ? "#00875a"
-                        : m.status === "active"
-                        ? "#b45309"
-                        : "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                    fontSize: 16,
-                    flexShrink: 0,
-                    zIndex: 2,
-                    border:
-                      m.status === "completed"
-                        ? "2px solid #00b074"
-                        : m.status === "active"
-                        ? "2px solid #f59e0b"
-                        : "2px solid #cbd5e1",
-                  }}
-                >
-                  {m.status === "completed" ? "✓" : m.status === "active" ? "→" : "○"}
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, paddingBottom: idx < MILESTONES.length - 1 ? 16 : 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
-                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#002e6e" }}>
-                      {m.title}
-                    </h4>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: m.status === "active" ? "#b45309" : "#64748b" }}>
-                      {m.date}
-                    </span>
+                {readiness.what_is_affecting.length > 0 && (
+                  <div style={{ marginTop: 16, padding: "12px", background: "#FFF8ED", borderRadius: 8, border: "1px solid #F5D9A8" }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "#D9822B", marginBottom: 6 }}>What is affecting your score:</p>
+                    {readiness.what_is_affecting.map((issue, i) => (
+                      <p key={i} style={{ fontSize: 12, color: "#52606D" }}>• {issue}</p>
+                    ))}
                   </div>
-                  <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
-                    {m.desc}
-                  </p>
+                )}
+              </>
+            ) : (
+              <div style={{ color: "#52606D", fontSize: 14 }}>
+                <p>Create a mission and complete your profile to see your readiness breakdown.</p>
+                <Link href="/mission/new" style={{ color: "#0057D9", fontWeight: 600, textDecoration: "none" }}>
+                  Create Mission →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* NBA */}
+        {nba && (
+          <div style={{
+            background: "#EEF4FF", border: "1.5px solid #0057D9",
+            borderRadius: 14, padding: "20px 24px", marginBottom: 24,
+            display: "flex", alignItems: "center", gap: 16,
+          }}>
+            <span style={{ fontSize: 28 }}>{nba.icon}</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#0057D9", textTransform: "uppercase", letterSpacing: "0.06em" }}>Next Best Action</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: "#102A43" }}>{nba.action}</p>
+              <p style={{ fontSize: 13, color: "#52606D" }}>{nba.reason}</p>
+            </div>
+            <Link href={nba.target_route} style={{
+              padding: "10px 20px", background: "#0057D9", color: "#fff",
+              borderRadius: 8, fontWeight: 600, fontSize: 13, textDecoration: "none",
+            }}>
+              Take Action
+            </Link>
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
+          {/* Mission stage */}
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", border: "1px solid #D9E2EC" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#52606D", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Mission Stage
+            </h3>
+            {mission ? (
+              <>
+                <p style={{ fontSize: 24, fontWeight: 800, color: "#0057D9" }}>{mission.stage}/7</p>
+                <p style={{ fontSize: 13, color: "#102A43", fontWeight: 600 }}>
+                  {MISSION_STAGES[mission.stage - 1]?.name}
+                </p>
+                <div style={{ display: "flex", gap: 3, marginTop: 12 }}>
+                  {MISSION_STAGES.map((s, i) => (
+                    <div key={s.id} style={{
+                      flex: 1, height: 5, borderRadius: 3,
+                      background: i + 1 < mission.stage ? "#0057D9" : i + 1 === mission.stage ? "#00AEEF" : "#E8F0FE",
+                    }} />
+                  ))}
                 </div>
+              </>
+            ) : (
+              <p style={{ color: "#52606D", fontSize: 13 }}>No active mission</p>
+            )}
+          </div>
+
+          {/* Profile */}
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", border: "1px solid #D9E2EC" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#52606D", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Financial Profile
+            </h3>
+            <p style={{ fontSize: 24, fontWeight: 800, color: "#00AEEF" }}>
+              {profile ? `${profile.completion_percentage.toFixed(0)}%` : "0%"}
+            </p>
+            <p style={{ fontSize: 13, color: "#52606D" }}>
+              {profile?.monthly_income ? `₹${formatAmount(profile.monthly_income)}/mo` : "No income added"}
+            </p>
+            <Link href="/profile" style={{ display: "block", marginTop: 12, fontSize: 12, color: "#0057D9", fontWeight: 600, textDecoration: "none" }}>
+              Update profile →
+            </Link>
+          </div>
+
+          {/* Documents */}
+          <div style={{ background: "#fff", borderRadius: 14, padding: "20px", border: "1px solid #D9E2EC" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#52606D", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Documents
+            </h3>
+            <p style={{ fontSize: 24, fontWeight: 800, color: "#16803C" }}>{confirmedDocs.length}/{documents.length}</p>
+            <p style={{ fontSize: 13, color: "#52606D" }}>Verified</p>
+            {pendingDocs.length > 0 && (
+              <p style={{ fontSize: 12, color: "#D9822B", fontWeight: 600, marginTop: 6 }}>
+                {pendingDocs.length} needs review
+              </p>
+            )}
+            <Link href="/documents" style={{ display: "block", marginTop: 8, fontSize: 12, color: "#0057D9", fontWeight: 600, textDecoration: "none" }}>
+              Manage documents →
+            </Link>
+          </div>
+        </div>
+
+        {/* Completed checklist */}
+        <div style={{ background: "#fff", borderRadius: 14, padding: "24px", border: "1px solid #D9E2EC" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#102A43", marginBottom: 16 }}>Journey Checklist</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              { label: "Mission created", done: !!mission, link: "/mission/new" },
+              { label: "Financial profile started", done: !!profile && profile.completion_percentage > 0, link: "/profile" },
+              { label: "Financial profile 80%+", done: !!profile && profile.completion_percentage >= 80, link: "/profile" },
+              { label: "First document uploaded", done: documents.length > 0, link: "/documents" },
+              { label: "First document verified", done: confirmedDocs.length > 0, link: "/documents" },
+              { label: "Readiness score 60%+", done: (readiness?.overall_score || 0) >= 60, link: "/progress" },
+              { label: "Readiness score 80%+", done: (readiness?.overall_score || 0) >= 80, link: "/progress" },
+              { label: "Mission stage 4+ reached", done: !!mission && mission.stage >= 4, link: "/missions" },
+            ].map((item) => (
+              <div key={item.label} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 14px", borderRadius: 8,
+                background: item.done ? "#F0FFF4" : "#F5F8FC",
+                border: `1px solid ${item.done ? "#B7E4C7" : "#E8F0FE"}`,
+              }}>
+                <span style={{ fontSize: 18 }}>{item.done ? "✅" : "⬜"}</span>
+                <span style={{ flex: 1, fontSize: 13, color: item.done ? "#16803C" : "#52606D", fontWeight: item.done ? 600 : 400 }}>
+                  {item.label}
+                </span>
+                {!item.done && (
+                  <Link href={item.link} style={{ fontSize: 12, color: "#0057D9", fontWeight: 600, textDecoration: "none" }}>
+                    Complete →
+                  </Link>
+                )}
               </div>
             ))}
           </div>

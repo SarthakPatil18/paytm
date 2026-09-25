@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -24,6 +24,7 @@ class MissionUpdate(BaseModel):
     deadline: Optional[datetime] = None
     timeline_text: Optional[str] = None
     status: Optional[str] = None
+    stage: Optional[int] = None
 
 
 class MissionResponse(BaseModel):
@@ -31,13 +32,14 @@ class MissionResponse(BaseModel):
     user_id: int
     goal_category: str
     goal_title: str
-    description: Optional[str]
-    destination: Optional[str]
-    target_amount: Optional[float]
+    description: Optional[str] = None
+    destination: Optional[str] = None
+    target_amount: Optional[float] = None
     currency: str
-    deadline: Optional[datetime]
-    timeline_text: Optional[str]
+    deadline: Optional[datetime] = None
+    timeline_text: Optional[str] = None
     status: str
+    stage: int = 1
     created_at: datetime
     updated_at: datetime
 
@@ -71,3 +73,30 @@ class ChatResponse(BaseModel):
     reply: str
     suggested_actions: list[str] = []
 
+
+# Readiness schemas
+class ReadinessComponentResponse(BaseModel):
+    name: str
+    score: float
+    weight: float
+    max_score: float
+    current: float
+    details: List[str]
+    missing: List[str]
+
+
+class ReadinessResponse(BaseModel):
+    overall_score: float
+    components: List[ReadinessComponentResponse]
+    what_is_affecting: List[str]
+    next_improvement: Optional[str] = None
+    stage_recommendation: int
+
+
+# NBA schemas
+class NBAResponse(BaseModel):
+    action: str
+    reason: str
+    priority: str
+    target_route: str
+    icon: str

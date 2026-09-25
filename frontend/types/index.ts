@@ -25,6 +25,7 @@ export interface FinancialMission {
   deadline: string | null;
   timeline_text: string | null;
   status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED";
+  stage: number;
   created_at: string;
   updated_at: string;
 }
@@ -50,8 +51,11 @@ export interface FinancialProfile {
   monthly_expenses: number | null;
   savings: number | null;
   existing_emi: number | null;
+  monthly_investments: number | null;
+  dependents: number | null;
   income_source: string | null;
   employment_status: string | null;
+  employment_experience_years: number | null;
   currency: string;
   completion_percentage: number;
   updated_at: string;
@@ -93,6 +97,49 @@ export interface DocumentExtraction {
   created_at: string;
 }
 
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  related_resource: string | null;
+  related_resource_id: number | null;
+  created_at: string;
+}
+
+export interface NotificationSummary {
+  unread_count: number;
+  notifications: Notification[];
+}
+
+export interface ReadinessComponent {
+  name: string;
+  score: number;
+  weight: number;
+  max_score: number;
+  current: number;
+  details: string[];
+  missing: string[];
+}
+
+export interface ReadinessReport {
+  overall_score: number;
+  components: ReadinessComponent[];
+  what_is_affecting: string[];
+  next_improvement: string | null;
+  stage_recommendation: number;
+}
+
+export interface NBAAction {
+  action: string;
+  reason: string;
+  priority: "critical" | "high" | "medium" | "low";
+  target_route: string;
+  icon: string;
+}
+
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   salary_slip: "Salary Slip",
   bank_statement: "Bank Statement",
@@ -106,10 +153,13 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 export const GOAL_CATEGORY_LABELS: Record<string, string> = {
   education: "Education",
   healthcare: "Healthcare",
-  home: "Home",
+  home: "Home Purchase",
+  home_purchase: "Home Purchase",
   vehicle: "Vehicle",
   business: "Business",
-  emergency: "Emergency",
+  emergency: "Emergency Fund",
+  travel: "Travel",
+  investment: "Investment",
   other: "Other",
 };
 
@@ -117,8 +167,28 @@ export const GOAL_CATEGORY_ICONS: Record<string, string> = {
   education: "🎓",
   healthcare: "🏥",
   home: "🏠",
+  home_purchase: "🏠",
   vehicle: "🚗",
   business: "💼",
-  emergency: "🚨",
+  emergency: "🛡️",
+  travel: "✈️",
+  investment: "📈",
   other: "⭐",
+};
+
+export const MISSION_STAGES = [
+  { id: 1, name: "Goal Definition", description: "Define your financial goal" },
+  { id: 2, name: "Financial Profile", description: "Complete your financial profile" },
+  { id: 3, name: "Document Verification", description: "Upload and verify documents" },
+  { id: 4, name: "Readiness Assessment", description: "Review your readiness score" },
+  { id: 5, name: "Financial Options", description: "Explore financial products" },
+  { id: 6, name: "Application Preparation", description: "Prepare your application" },
+  { id: 7, name: "Completion", description: "Mission complete" },
+];
+
+export const PRIORITY_COLORS: Record<string, string> = {
+  critical: "#D64545",
+  high: "#D9822B",
+  medium: "#0057D9",
+  low: "#16803C",
 };

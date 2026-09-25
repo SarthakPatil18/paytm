@@ -282,3 +282,31 @@ async def confirm_extraction(
     await db.refresh(extraction)
 
     return DocumentExtractionResponse.model_validate(extraction)
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a document. Audit logged."""
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You don't have access to this document.")
+
+    audit_repo = AuditRepository(db)
+    await audit_repo.log(
+        "DOCUMENT_DELETED",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=document_id,
+        metadata={"filename": doc.original_filename},
+    )
+
+    await doc_repo.delete(doc)
+    await db.commit()

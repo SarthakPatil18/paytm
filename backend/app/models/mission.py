@@ -15,9 +15,12 @@ class GoalCategory(str, enum.Enum):
     EDUCATION = "education"
     HEALTHCARE = "healthcare"
     HOME = "home"
+    HOME_PURCHASE = "home_purchase"
     VEHICLE = "vehicle"
     BUSINESS = "business"
     EMERGENCY = "emergency"
+    TRAVEL = "travel"
+    INVESTMENT = "investment"
     OTHER = "other"
 
 
@@ -39,6 +42,7 @@ class FinancialMission(Base):
     timeline_text = Column(String, nullable=True)
 
     status = Column(String, default=MissionStatus.ACTIVE)
+    stage = Column(Integer, default=1)  # 1-7 journey stages
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
