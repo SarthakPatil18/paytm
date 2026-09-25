@@ -204,7 +204,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* FINANCIAL DATA CARDS (Paytm-style) */}
+        {/* FINANCIAL DATA CARDS (FinPath Design System) */}
         {!isEditing ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
             {/* Card 1: Monthly Income */}

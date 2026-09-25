@@ -8,7 +8,7 @@
     --color-border: #e2e8f0;
     --color-border-light: #edf2f7;
     
-    /* Paytm-inspired Fintech Blue Palette */
+    /* FinPath Fintech Blue Palette */
     --color-primary-navy: #002e6e;
     --color-accent: #0052cc;
     --color-cyan: #00baf2;
@@ -55,7 +55,7 @@
 }
 
 @layer components {
-  /* Paytm-style Card */
+  /* FinPath Design System Card */
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);

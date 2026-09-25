@@ -1,6 +1,6 @@
 # FinPath AI — Complete Walkthrough & Presentation Guide
 
-Welcome to the comprehensive walkthrough for **FinPath AI**, an AI-powered financial journey platform inspired by modern fintech design standards (Paytm blue aesthetic, clean whitespace, rounded cards, and strong visual hierarchy).
+Welcome to the comprehensive walkthrough for **FinPath AI**, an AI-powered financial journey platform featuring a proprietary deep financial blue design system, high-trust white surfaces, rounded cards, and strong visual hierarchy.
 
 ---
 
