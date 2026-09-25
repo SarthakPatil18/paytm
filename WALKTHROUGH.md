@@ -1,197 +1,186 @@
-# FinPath AI — Phase 1 Walkthrough & User Guide
+# FinPath AI — Complete Walkthrough & Presentation Guide
 
-Welcome to the **FinPath AI** Phase 1 documentation. This guide walks you through the platform concept, system architecture, core user journeys, API specifications, and local verification steps.
-
----
-
-## 1. Product Overview
-
-> **"FinPath is a goal-first financial journey platform. Instead of asking the customer which financial product they want, FinPath first understands what the customer is trying to achieve and creates a Financial Mission around that goal."**
-
-### Traditional Banking vs. FinPath AI
-| Dimension | Traditional Approach | FinPath AI Approach |
-| :--- | :--- | :--- |
-| **Starting Point** | Catalog of loans, credit cards, mutual funds | Customer's real-life goal & destination |
-| **User Input** | Rigid multi-page loan applications | Natural conversational prompt (text or voice) |
-| **Journey Model** | Transactional & fragmented | Unified **Financial Mission** with milestone tracking |
-| **Document Processing**| Manual paperwork verification | Intelligent document OCR & auto-extraction |
-| **Profile Building** | Static credit scores & isolated KYC | Living Financial Profile calculated across missions |
+Welcome to the comprehensive walkthrough for **FinPath AI**, an AI-powered financial journey platform inspired by modern fintech design standards (Paytm blue aesthetic, clean whitespace, rounded cards, and strong visual hierarchy).
 
 ---
 
-## 2. System Architecture
+## 1. Product Philosophy & Core Differentiator
+
+Traditional banking platforms are **product-catalog centric**: they present a wall of credit cards, personal loans, and mutual funds, forcing the user to decipher which product solves their life event.
+
+**FinPath AI is goal-first**:
 
 ```mermaid
-graph TD
-    subgraph Frontend["Frontend (Next.js 15 App Router)"]
-        UI_Home["Landing Page /"]
-        UI_Demo["Instant Demo /demo"]
-        UI_Auth["Auth (/login, /register)"]
-        UI_Wizard["Mission Wizard /mission/new"]
-        UI_Dash["Dashboard /dashboard"]
-        UI_Docs["Document Center /documents"]
-        UI_Profile["Financial Profile /profile"]
-    end
-
-    subgraph Backend["Backend (FastAPI + Async Python 3.13)"]
-        API_Auth["Auth API (/api/auth)"]
-        API_AI["AI Parsing API (/api/ai/parse-goal)"]
-        API_Missions["Missions API (/api/missions)"]
-        API_Docs["Documents API (/api/documents)"]
-        API_Profile["Profile API (/api/profile)"]
-        
-        Service_AI["Gemini AI Service / Fallback Parser"]
-        Service_Doc["Document Extraction Service"]
-        Service_Security["Bcrypt Security & JWT"]
-    end
-
-    subgraph Database["Persistence Layer"]
-        DB[(SQLite / PostgreSQL)]
-        Storage[(Local Encrypted File Storage)]
-    end
-
-    UI_Wizard --> API_AI
-    UI_Wizard --> API_Missions
-    UI_Dash --> API_Missions
-    UI_Docs --> API_Docs
-    UI_Profile --> API_Profile
-    UI_Auth --> API_Auth
-
-    API_AI --> Service_AI
-    API_Docs --> Service_Doc
-    API_Docs --> Storage
-    API_Auth --> Service_Security
-
-    API_Missions --> DB
-    API_Docs --> DB
-    API_Profile --> DB
-    API_Auth --> DB
+graph LR
+    Goal["1. User Life Goal\n(Natural Language)"] --> AI["2. AI Understanding\n(Gemini Extraction)"]
+    AI --> Mission["3. Financial Mission\n(Target & Milestones)"]
+    Mission --> Profile["4. Verified Profile\n(Income & Documents)"]
+    Profile --> NBA["5. Next Best Action\n('What do I do next?')"]
+    NBA --> Journey["6. Adaptive Journey\n(Pre-approval & Disbursement)"]
 ```
+
+Every screen answers three fundamental questions for the customer:
+1. **Where am I?** (Current stage in the financial journey)
+2. **What is my current financial status?** (Readiness %, verified assets, missing requirements)
+3. **What should I do next?** (The prominent *Next Best Action*)
 
 ---
 
-## 3. Core Feature Walkthrough
+## 2. Tour of the Refined Platform
 
-### 3.1 Landing Page (`/`)
-* **Dynamic Typewriter Hero**: Cycles through real-world financial goals:
-  * *"I want to study in Germany next year with ₹12 lakh"*
-  * *"I want to buy my first home in 3 years with ₹50 lakh"*
-  * *"I want to build an emergency fund of ₹3 lakh in 6 months"*
-* **Instant Value Proposition**: Highlights the 4 pillars: Natural Goal Input, Financial Missions, Smart Readiness, and Intelligent Extraction.
-* **Instant Demo Button**: Direct 1-click access to pre-populated demo data without registering.
-
-### 3.2 Instant Demo Mode (`/demo`)
-* Pre-loaded with a completed mission:
-  * **Goal**: Study in Germany (Education)
-  * **Target Amount**: ₹12,00,000
-  * **Timeline**: 1 year
-  * **Readiness Score**: 73% Complete
-  * **Documents**: Passport (Confirmed), Bank Statement (Confirmed), Offer Letter (Extracted), Salary Slip (Pending)
-* Enables instant stakeholder demonstrations without signing up.
-
-### 3.3 Goal Understanding & Mission Creation (`/mission/new`)
-1. **Conversational Input**: User inputs a natural goal sentence.
-2. **AI Extraction**: Uses Google Gemini AI (with a built-in regex fallback) to extract:
-   * `goal_category` (e.g., `education`, `home_purchase`, `travel`, `emergency_fund`)
-   * `target_amount` & `currency` (e.g., `1200000`, `INR`)
-   * `destination` (e.g., `Germany`)
-   * `timeline_text` / `deadline` (e.g., `1 year`)
-3. **Clarification Handling**: If key parameters are missing, the system prompts targeted clarification questions.
-4. **Structured Confirmation Card**: User can inspect and adjust parsed numbers before creating the mission.
-
-### 3.4 Financial Mission Dashboard (`/dashboard`)
-* **Mission Header**: Displays active mission status, target amount, currency, and timeline.
-* **Milestone Progress Bar**: Combines document completion, profile completion, and goal definition into an aggregate journey readiness score.
-* **Mission Requirements Checklist**: Clear actionable tasks to progress the mission.
-
-### 3.5 Document Verification Center (`/documents`)
-* **Drag-and-Drop Uploader**: Accepts PDF, JPEG, and PNG files up to 10MB.
-* **Duplicate Detection**: Computes SHA-256 file hashes to prevent accidental re-uploads.
-* **Document Preview & Extraction Review**:
-  * Shows extracted fields (e.g., Document Number, Holder Name, Expiry Date, Bank Name, Account Number).
-  * In-line editing interface allowing users to review and confirm OCR data before persisting.
-
-### 3.6 Financial Profile Management (`/profile`)
-* Captures user financial snapshot: Monthly Income, Monthly Expenses, Existing EMIs, Savings, and Employment Status.
-* **Real-time Completion Indicator**: Visual progress bar tracking profile data density.
+### 2.1 Landing Page (`http://localhost:3000`)
+* **Hero Headline**: *"Turn your financial goal into a clear journey."*
+* **Interactive Conversational Goal Input**:
+  * Try clicking one of the sample prompt chips (e.g., *"I want to study in Germany next year with ₹12 lakh"*).
+  * Click **"Analyze with AI"** to see the 4-step real-time AI extraction simulation:
+    - `✓ Goal detected (Education)`
+    - `✓ Target amount detected (₹12,00,000)`
+    - `✓ Timeline detected (1 Year)`
+    - `✓ Financial mission ready`
+  * Click **"Create Financial Mission"** to jump straight into the mission wizard with your parameters pre-populated.
+* **4 Core Capabilities**: Highlights Goal Understanding, Financial Mission, Intelligent Document OCR, and Adaptive Journey.
 
 ---
 
-## 4. API Endpoints Reference
-
-Base URL: `http://localhost:8000`  
-Interactive Swagger Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-| Group | Method | Endpoint | Description |
-| :--- | :--- | :--- | :--- |
-| **Auth** | `POST` | `/api/auth/register` | Register a new user and receive JWT bearer token |
-| **Auth** | `POST` | `/api/auth/login` | Log in with email & password |
-| **Auth** | `GET` | `/api/auth/me` | Fetch currently authenticated user |
-| **AI** | `POST` | `/api/ai/parse-goal` | Parse natural language goal into structured entity |
-| **Missions** | `POST` | `/api/missions/` | Create a confirmed Financial Mission |
-| **Missions** | `GET` | `/api/missions/` | List all missions belonging to the active user |
-| **Missions** | `GET` | `/api/missions/{id}` | Retrieve mission details |
-| **Missions** | `PATCH`| `/api/missions/{id}` | Update mission title, status, or parameters |
-| **Documents**| `POST` | `/api/documents/upload` | Upload document file (multipart/form-data) |
-| **Documents**| `GET` | `/api/documents/` | List user documents |
-| **Documents**| `GET` | `/api/documents/{id}/extraction` | Get OCR extraction fields |
-| **Documents**| `POST` | `/api/documents/{id}/confirm` | Confirm extracted values |
-| **Profile** | `GET` | `/api/profile/` | Fetch user financial profile |
-| **Profile** | `PATCH`| `/api/profile/` | Update income, expenses, and savings |
-| **System** | `GET` | `/health` | Healthcheck returning `{ "status": "healthy" }` |
+### 2.2 Instant Demo Mode (`http://localhost:3000/demo`)
+* **Zero-login demonstration** tailored for hackathon juries and stakeholders.
+* **Pre-loaded with real-life data**:
+  * **Mission**: Study in Germany
+  * **Target**: ₹12,00,000 | **Timeline**: 1 Year | **Readiness**: 73%
+  * **Next Best Action Card**: *"Verify your offer letter — TUM M.Sc CS tuition and dates need confirmation."*
+  * **Interactive Document Cards**:
+    - `Passport` — Confirmed ✓
+    - `Bank Statement` — Confirmed ✓ (HDFC ₹3,45,000 balance)
+    - `Offer Letter` — Review Required ⚠️ (Click **"Review Document"** to trigger the AI verification modal, then click **"Confirm Information"** to watch the readiness score jump to **86%**!)
+    - `Salary Slip` — Pending
 
 ---
 
-## 5. Verification & Testing
-
-### Running Automated Tests
-Run the complete backend test suite from `backend/`:
-```powershell
-python -m pytest tests/ -v
-```
-
-### Test Coverage Results (18/18 Passing)
-* `test_register_user` — User creation and JWT token issuance.
-* `test_register_duplicate_email` — HTTP 400 rejection on duplicate email.
-* `test_login` — Credential validation and token receipt.
-* `test_login_wrong_password` — HTTP 401 unauthorized rejection.
-* `test_parse_goal_germany_study` — Accurate extraction of Germany Education ₹12L goal.
-* `test_parse_goal_missing_info` — Clarification questions trigger when amount is omitted.
-* `test_create_mission` — Creation and persistence of Financial Mission.
-* `test_mission_persists` — Verification of database integrity across queries.
-* `test_mission_authorization` — Cross-tenant isolation (User B cannot access User A's mission).
-* `test_list_missions_isolation` — Listing only shows authenticated user's records.
-* `test_upload_invalid_format` — Rejection of unsupported file extensions (.exe, .txt).
-* `test_upload_valid_document` — Storage and extraction of PDF/image uploads.
-* `test_upload_duplicate_rejected` — SHA-256 hash collision rejection.
-* `test_document_authorization` — Documents strictly isolated by user ID.
-* `test_empty_profile` — Default profile initialization.
-* `test_update_profile` — Saving income, expenses, and employment status.
-* `test_profile_completion_calculation` — Percentage calculation accuracy.
+### 2.3 Main Dashboard (`http://localhost:3000/dashboard`)
+* **Personalized Header**: `Good morning, [User]` with real-time status summary.
+* **Prominent Next Best Action Banner**: Dynamic recommendation engine that guides users based on real database state:
+  * Prompts document verification if unreviewed files exist.
+  * Prompts profile completion if financial profile is under 80%.
+  * Prompts missing bank statements if fewer than 3 documents are uploaded.
+* **Financial Mission Hero Card**:
+  * Displays ₹12,00,000 target, 1-year timeline, and dynamic readiness gauge.
+* **5-Stage Progress Breakdown**:
+  * Goal Definition: `Confirmed ✓`
+  * Financial Profile: `Verified ✓ (82%)`
+  * Documents: `4/5 Verified`
+  * Readiness Assessment: `70% In Progress`
+  * Financial Options: `Pending`
 
 ---
 
-## 6. How to Run Locally
+### 2.4 Document Center (`http://localhost:3000/documents`)
+* **Drag-and-Drop Uploader**: Accepts PDF, JPG, PNG up to 10MB with SHA-256 deduplication.
+* **FinPath Trusted Data Architecture Banner**:
+  `1. AI Extracted → 2. User Verifies → 3. Data Becomes Trusted`
+* **4 Standard Mission Requirements**:
+  * Passport / National ID
+  * Bank Statement (Last 6 Months)
+  * Offer Letter / Admission
+  * Salary Slip / Co-Borrower Income Proof
+* **Interactive AI Verification Modal**:
+  * Inspect extracted data (University, Program, Tuition €12,000, Confidence 94%).
+  * Confirm values to lock them as trusted database records.
+* **Direct Deep-Dive Link**: View and edit specific raw OCR fields at `/documents/[id]`.
 
-### Prerequisites
-* Python 3.11+ (Python 3.13 supported)
-* Node.js 18+ & npm
-* Git
+---
 
-### Starting the Backend
-```powershell
-cd s:\paytm\backend
-$env:DATABASE_URL="sqlite+aiosqlite:///./finpath_dev.db"
-$env:SECRET_KEY="dev-secret-finpath-2026"
-python -m uvicorn app.main:app --port 8000 --reload
-```
+### 2.5 Missions & Journey Stages (`http://localhost:3000/missions`)
+* Displays active and archived financial missions.
+* **The 7 Journey Stages Roadmap**:
+  ```
+  1. Goal Definition (✓ Completed)
+  ↓
+  2. Financial Profile (✓ Completed)
+  ↓
+  3. Document Verification (📍 Active Stage)
+  ↓
+  4. Readiness Assessment (In Calculation)
+  ↓
+  5. Financial Options (Upcoming)
+  ↓
+  6. Application & Pre-Approval (Upcoming)
+  ↓
+  7. Disbursement & Completion (Upcoming)
+  ```
+* **Interactive Inspection**: Click any stage pill to see its specific requirements and milestones.
 
-### Starting the Frontend
-```powershell
-cd s:\paytm\frontend
-npm run dev
-```
+---
 
-### Accessing the Web Application
-* **Frontend**: [http://localhost:3000](http://localhost:3000)
-* **Backend API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+### 2.6 Financial Profile Dashboard (`http://localhost:3000/profile`)
+* **Fintech Metric Cards**:
+  * Monthly Income: `₹75,000`
+  * Monthly Expenses: `₹38,000` (50% expense ratio)
+  * Liquid Savings: `₹4,20,000` (Verified via HDFC statement)
+  * Existing EMIs: `₹12,000` (16% DTI, low risk)
+  * Employment: `SALARIED` (3+ years experience)
+* **Profile Completeness Bar (82%)**:
+  * Dynamic recommendation callout: *"Add monthly investment & provident fund details to reach 100%"*.
+* **Inline Edit Form**: Toggle *"Edit Profile"* to update any figures with instant recalculation.
+
+---
+
+### 2.7 AI Journey Assistant (`http://localhost:3000/ai`)
+* **Conversational Financial Copilot**:
+  * Connected to `POST /api/ai/chat` with active mission context awareness.
+* **Pre-Built Prompt Chips**:
+  * *"What should I do next?"*
+  * *"What documents am I still missing?"*
+  * *"Why is my salary slip required?"*
+  * *"How complete is my financial profile?"*
+  * *"Explain my Germany education mission"*
+* **Actionable Replies**: Responses include one-click action buttons (e.g., *"⚡ Review Salary Slip"*).
+
+---
+
+### 2.8 Progress Dashboard (`http://localhost:3000/progress`)
+* **73% Readiness Header Banner**: High-impact visual score card.
+* **Completed vs. Pending Actions Matrix**: Side-by-side comparison of verified achievements vs. current bottlenecks.
+* **Chronological Milestone Timeline**: Step-by-step audit trail showing dates, verification badges, and next steps.
+
+---
+
+### 2.9 Global Navigation & Smart Notifications
+* **Top Navigation Bar**: Sticky header with clean logo, route indicators, and user avatar.
+* **Notification Bell**:
+  * Shows unread badge count.
+  * Dropdown lists contextual alerts:
+    - *"Document Verification Required — Your salary slip was parsed."*
+    - *"Profile 82% Complete — Add investments to reach 100%."*
+    - *"Mission Milestone Ready — Funding options calculating."*
+  * Supports *"Mark all read"* and direct navigation on click.
+* **Mobile Bottom Bar**: Appears automatically on screens `<= 768px` (`Home | Missions | Documents | AI | Profile`).
+
+---
+
+## 3. Recommended 3-Minute Live Demo Script
+
+Follow this sequence when presenting to a jury or stakeholder:
+
+1. **Start on Landing Page (`/`)**:
+   - Point out the headline and click the prompt chip: *"I want to study in Germany next year with ₹12 lakh"*.
+   - Click **"Analyze with AI"** to demonstrate real-time natural language extraction.
+2. **Jump to Demo Mode (`/demo`)**:
+   - Explain: *"This is a pre-loaded real-life journey for a student heading to Germany."*
+   - Highlight the **Next Best Action Card**: *"The system immediately answers 'What should I do next?'"*.
+   - Click **"Review Document"** on the Offer Letter card → show the AI extraction modal (TUM, €12,00,000 tuition, 94% confidence) → click **"Confirm Information"** → observe the readiness score increase to **86%**.
+3. **Showcase AI Assistant (`/ai`)**:
+   - Click the prompt chip: *"What documents am I still missing?"*.
+   - Show how the AI assistant responds with the user's real missing documents and suggests the next action.
+4. **Showcase Missions Roadmap (`/missions`)**:
+   - Walk through the **7 Journey Stages** from Goal → Profile → Documents → Assessment → Options → Application → Completion.
+5. **Conclude on Financial Profile (`/profile`)**:
+   - Show the 82% completeness score, verified liquid assets, and DTI ratio.
+
+---
+
+## 4. Verification & Health Summary
+
+* **Backend Health**: `GET http://localhost:8000/health` → `{"status": "healthy"}`
+* **Automated Tests**: `python -m pytest tests/` → **18/18 passing (100%)**
+* **Frontend Build**: `npm run build` → **14/14 static pages generated with 0 errors**
+* **Git Repository**: Synced and pushed to [`https://github.com/Sushrut-Kale/paytm.git`](https://github.com/Sushrut-Kale/paytm.git) (`main` branch)
