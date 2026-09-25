@@ -25,7 +25,10 @@ services:
       - key: STORAGE_PATH
         value: /tmp/storage
       - key: FRONTEND_URL
-        sync: false
+        fromService:
+          name: finpath-frontend
+          type: web
+          property: host
 
   # ---------------------------------------------------------------------------
   # Frontend UI (Next.js)
@@ -39,4 +42,7 @@ services:
     plan: free
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        sync: false
+        fromService:
+          name: finpath-backend
+          type: web
+          property: host
