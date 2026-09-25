@@ -60,3 +60,14 @@ class GoalParseResponse(BaseModel):
     confidence: float = 0.0
     needs_clarification: bool = False
     clarification_questions: list[str] = []
+
+
+class ChatRequest(BaseModel):
+    message: str
+    mission_id: Optional[int] = None
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    suggested_actions: list[str] = []
+

@@ -154,5 +154,67 @@ class GoalUnderstandingService:
             clarification_questions=[] if category else ["What type of financial goal are you trying to achieve?"]
         )
 
+    async def chat(self, message: str, context: Optional[dict] = None) -> dict:
+        """Provide contextual financial journey assistant responses."""
+        ctx = context or {}
+        mission_title = ctx.get("mission_title", "Financial Mission")
+        target_amount = ctx.get("target_amount", 0)
+        profile_pct = ctx.get("profile_completion", 0)
+        doc_count = ctx.get("doc_count", 0)
+        unverified_docs = ctx.get("unverified_docs", [])
+
+        # Try LLM if configured
+        if self.model:
+            try:
+                system_prompt = f"""You are FinPath AI, an empathetic, highly intelligent Indian fintech journey assistant.
+User's Current Context:
+- Active Mission: {mission_title}
+- Target Amount: ₹{target_amount:,.0f} if target_amount else 'Not specified'
+- Profile Completion: {profile_pct}%
+- Total Documents: {doc_count}
+- Documents needing verification: {', '.join(unverified_docs) if unverified_docs else 'None'}
+
+Answer the user concisely, professionally, and encouragingly. Keep replies under 3 paragraphs with bullet points where helpful.
+User says: {message}"""
+                response = self.model.generate_content(system_prompt)
+                return {
+                    "reply": response.text.strip(),
+                    "suggested_actions": ["Review Next Best Action", "Upload Missing Document", "Update Profile"]
+                }
+            except Exception as e:
+                logger.warning(f"LLM chat failed, using fallback: {e}")
+
+        # Intelligent contextual fallback
+        msg_lower = message.lower()
+        if "next" in msg_lower or "do next" in msg_lower or "action" in msg_lower:
+            if unverified_docs:
+                doc_name = unverified_docs[0]
+                reply = f"Your highest priority next action is to verify your {doc_name}. We extracted information from it that needs your confirmation to become trusted data."
+                actions = [f"Review {doc_name}", "Check Requirements", "View Dashboard"]
+            elif profile_pct < 80:
+                reply = f"Your next recommended step is to complete your Financial Profile (currently at {profile_pct}%). Adding your income and expense details will unlock accurate loan eligibility."
+                actions = ["Complete Profile", "Upload Bank Statement", "Review Mission"]
+            else:
+                reply = f"You are making stellar progress on '{mission_title}'! Your next milestone is the Financial Readiness Assessment."
+                actions = ["View Assessment", "Review Timeline", "Check Options"]
+        elif "missing" in msg_lower or "document" in msg_lower or "require" in msg_lower:
+            reply = f"For your '{mission_title}' journey, we standardly require:\n• Valid Passport / National ID\n• Recent 6-Month Bank Statement\n• Salary Slip or Income Proof\n• Admission / University Offer Letter\n\nCurrently, you have {doc_count} document(s) uploaded."
+            actions = ["Upload Document", "Review Documents", "Check Checklist"]
+        elif "profile" in msg_lower or "complete" in msg_lower:
+            reply = f"Your Financial Profile is currently {profile_pct}% complete. Completing your profile gives lenders confidence and provides personalized funding options."
+            actions = ["Update Profile", "Add Monthly Savings", "Add Existing EMI"]
+        elif "explain" in msg_lower or "mission" in msg_lower or "goal" in msg_lower:
+            reply = f"Your Financial Mission '{mission_title}' is configured with a target of ₹{target_amount:,.0f}. FinPath tracks your journey through 7 stages: Goal Definition → Profile → Documents → Assessment → Financial Options → Application → Completion."
+            actions = ["View Stages", "Next Best Action", "Explore Funding"]
+        else:
+            reply = f"I'm your FinPath AI journey assistant. I'm tracking your mission '{mission_title}' (target ₹{target_amount:,.0f}). I can help you understand missing documents, verify extracted information, or guide you through your next best financial steps."
+            actions = ["What should I do next?", "What documents are missing?", "How complete is my profile?"]
+
+        return {
+            "reply": reply,
+            "suggested_actions": actions
+        }
+
 
 goal_understanding_service = GoalUnderstandingService()
+

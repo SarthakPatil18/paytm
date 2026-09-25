@@ -39,20 +39,21 @@ export default function LoginPage() {
     }}>
       <div style={{ width: "100%", maxWidth: 400 }}>
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <div style={{
-              width: 36, height: 36, background: "#1d4ed8",
-              borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center"
+              width: 38, height: 38, background: "linear-gradient(135deg, #002e6e 0%, #0052cc 60%, #00baf2 100%)",
+              borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 2px 10px rgba(0, 82, 204, 0.25)"
             }}>
-              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>F</span>
+              <span style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>F</span>
             </div>
-            <span style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>FinPath AI</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: "#002e6e", letterSpacing: "-0.02em" }}>FinPath AI</span>
           </Link>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", marginTop: 28, marginBottom: 8 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#002e6e", marginTop: 24, marginBottom: 6 }}>
             Welcome back
           </h1>
-          <p style={{ color: "#6b7280", fontSize: 14 }}>Sign in to continue your financial journey</p>
+          <p style={{ color: "#475569", fontSize: 14 }}>Sign in to continue your financial journey</p>
         </div>
 
         {/* Card */}

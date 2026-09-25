@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/layout/AppNav";
 import { parseGoal, createMission } from "@/lib/services";
@@ -23,6 +23,17 @@ export default function NewMissionPage() {
   // Natural language input
   const [goalText, setGoalText] = useState("");
   const [parsed, setParsed] = useState<GoalParseResponse | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const textParam = params.get("text") || sessionStorage.getItem("finpath_initial_goal");
+      if (textParam) {
+        setGoalText(textParam);
+        sessionStorage.removeItem("finpath_initial_goal");
+      }
+    }
+  }, []);
 
   // Structured input
   const [structured, setStructured] = useState({

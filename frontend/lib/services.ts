@@ -58,6 +58,11 @@ export async function parseGoal(text: string): Promise<GoalParseResponse> {
   return res.data;
 }
 
+export async function chatAssistant(message: string, missionId?: number): Promise<{ reply: string; suggested_actions: string[] }> {
+  const res = await api.post("/api/ai/chat", { message, mission_id: missionId });
+  return res.data;
+}
+
 // ============================================================
 // DOCUMENTS
 // ============================================================

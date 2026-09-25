@@ -7,11 +7,12 @@ export function formatCurrency(amount: number | null | undefined, currency = "IN
   }).format(amount);
 }
 
-export function formatAmount(amount: number | null | undefined): string {
+export function formatAmount(amount: number | null | undefined, currency = "INR"): string {
   if (amount === null || amount === undefined) return "Not provided";
-  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)} Cr`;
-  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)} L`;
-  return `₹${amount.toLocaleString("en-IN")}`;
+  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "₹";
+  if (amount >= 10000000) return `${symbol}${(amount / 10000000).toFixed(1)} Cr`;
+  if (amount >= 100000) return `${symbol}${(amount / 100000).toFixed(1)} L`;
+  return `${symbol}${amount.toLocaleString("en-IN")}`;
 }
 
 export function getDocumentStatusLabel(status: string): string {

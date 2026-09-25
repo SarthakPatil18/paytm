@@ -133,30 +133,57 @@ export default function MissionDetailPage() {
 
           <hr className="divider" style={{ margin: "20px 0" }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
             <div>
-              <p className="label">Goal</p>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
+              <p className="label">Goal Category</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#002e6e" }}>
                 {GOAL_CATEGORY_LABELS[mission.goal_category]}
               </p>
             </div>
             <div>
               <p className="label">Target Amount</p>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#002e6e" }}>
                 {mission.target_amount ? formatAmount(mission.target_amount) : "Not specified"}
               </p>
             </div>
             <div>
               <p className="label">Timeline</p>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
-                {mission.timeline_text || "Not specified"}
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#002e6e" }}>
+                {mission.timeline_text || "1 Year"}
               </p>
             </div>
             <div>
               <p className="label">Destination</p>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
-                {mission.destination || "Not specified"}
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#002e6e" }}>
+                {mission.destination || "General"}
               </p>
+            </div>
+          </div>
+
+          <hr className="divider" style={{ margin: "20px 0" }} />
+
+          {/* 7 Journey Stages */}
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#0052cc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Journey Stages Roadmap
+            </span>
+            <div className="journey-stepper" style={{ marginTop: 8 }}>
+              {[
+                { label: "Goal", status: "completed" },
+                { label: "Profile", status: "completed" },
+                { label: "Documents", status: "active" },
+                { label: "Assessment", status: "upcoming" },
+                { label: "Options", status: "upcoming" },
+                { label: "Application", status: "upcoming" },
+                { label: "Completion", status: "upcoming" },
+              ].map((st, i, arr) => (
+                <div key={st.label} className="stage-item">
+                  <span className={`stage-pill ${st.status === "active" ? "active" : st.status === "completed" ? "completed" : ""}`}>
+                    {st.status === "completed" ? "✓ " : ""}{st.label}
+                  </span>
+                  {i < arr.length - 1 && <span className="stage-divider">→</span>}
+                </div>
+              ))}
             </div>
           </div>
         </div>
